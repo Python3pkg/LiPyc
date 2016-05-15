@@ -1,2 +1,2 @@
-# PycLi
+# LiPyc
 Image management application
