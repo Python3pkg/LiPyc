@@ -26,7 +26,8 @@ import shutil
 import random
 import logging
 import copy
-
+import threading
+from enum import Enum
 THUMBNAIL_HEIGHT = 128
 THUMBNAIL_WIDTH = 128
 DISPLAY_HEIGHT = 480
@@ -38,7 +39,6 @@ height= 5
 width = 5 #must be calculated en fonction de la resolution courrante
 
 def test(album_appp):
-    print(event.album)
     messagebox.showerror("Test", "Test testttestste")
 
 exts   = [ "png", "jpeg", "jpg", "mov", "mp4", "mpg", "thm", "3gp"]
@@ -143,27 +143,48 @@ class FileMetadata: #data extracted et en richie
         self.year = None
         self.month = None
         self.width, self.height = 0, 0
+    
+    def __deepcopy__(self, memo, new_parent=None):
+        new = FileMetadata( new_parent if new_parent else self.parent)    
+        new.datetime  = copy.deepcopy( self.datetime )
+        new.thumbnail  = copy.deepcopy( self.thumbnail )
+        new.year = copy.deepcopy( self.year )
+        new.month = copy.deepcopy( self.month )
+        new.width, new.height = copy.deepcopy( self.width ), copy.deepcopy( self.height )
+        
+        return new
         
     def extract(self):   
-        image = Image.open(self.parent.location)
-        self.width, self.height = image.size
+        if check_ext(self.parent.filename, img_exts):
+            image = Image.open(self.parent.location)
+            self.width, self.height = image.size
+        else:
+            image = None
+             
         self.extract_datetime(image)
         self.extract_thumbnail()
         
     def extract_datetime(self, image):
         self.datetime  = None
-        if check_ext(self.parent.filename, img_exts):
+        if image:
             info = image._getexif()
             if info :
                 for tag, value in info.items():
                     decoded = TAGS.get(tag, tag)
-                    if decoded == 'DateTime' :
+                    if decoded == 'DateTime' or decoded == 'DateTimeOriginal':
                         self.datetime  = time.strptime( value, "%Y:%m:%d %H:%M:%S")
             else:
-                logging.debug("info empty for %s   %s" % (parent.location, self.parent.filename))
+                logging.debug("info empty for %s   %s" % (self.parent.location, self.parent.filename))
                 
+            if not self.datetime:
+                tmp = ""
+                for tag, value in info.items():
+                    decoded = TAGS.get(tag, tag)
+                    tmp += decoded + "\n"
+                logging.debug("tag not found in %s" % tmp)
+            
         if not self.datetime :
-            nbs = os.path.getmtime(parent.location)
+            nbs = os.path.getmtime(self.parent.location)
             self.datetime  = time.gmtime(nbs)
         
         self.year    = time.strftime("%Y", self.datetime)
@@ -176,33 +197,69 @@ class FileMetadata: #data extracted et en richie
     def __eq__(self, m2):
         return self.datetime == m2.datetime
 
+
+def io_protect(default=None):
+    def decorator(function):
+        def new_function(self, *args, **kwargs):
+            res = default
+            with self.io_lock:
+                res = function(self, *args, **kwargs)
+            return res
+        return new_function
+    return decorator
+
 class File:
     def __init__(self, filename=None, location=None):
         self.filename = filename
         self.location = location
         self.md5 = None
-        self.metadata = FileMetadata(self)        
+        self.metadata = FileMetadata(self)      
+        self.extracted = False  
         
-        if location and filename:
+        if location and filename and not self.extracted:
             self.extract()
         
         self.garbage_number = 0 #if 0 then data suppressed
         
+        self.io_lock = threading.Lock() #pour gérer les export concurrant à une suppression si wait vérouiller on ne peut pas supprimer
+
+    def __deepcopy__(self, memo):
+        new = File(self.filename, self.location)
+        new.md5 = self.md5
+        new.metadata = self.metadata.__deepcopy__(None, new)
+        new.garbage_number = None #sort du garbage collector si on le copie
+        new.extracted = self.extracted #sort du garbage collector si on le copie
+        new.io_lock = self.io_lock
+        
+        return new
+    
+    def __getstate__(self):
+        tmp = copy.copy( self.__dict__ )
+        del tmp["io_lock"]
+        return tmp
+    
+    def __setstate__(self, state):
+        self.__dict__ = state
+        self.io_lock = threading.Lock()
+    
     def extract(self):
+        self.extracted = True
         self.md5 = hashlib.md5(open(self.location, "rb").read()).hexdigest()
         self.metadata.extract()
-
+    
     def create_thumbnails(self):
-        print("Creating thum %s" % self.metadata.thumbnail)        
-        im = Image.open( self.location )
-        im.thumbnail( (THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH) )
-        im.save(self.metadata.thumbnail, "JPEG")
-        
+        if check_ext(self.filename, img_exts):
+            im = Image.open( self.location )
+            im.thumbnail( (THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH) )
+            im.save(self.metadata.thumbnail, "JPEG")
+        else:
+            shutil.copy2("file_default.png", self.metadata.thumbnail)
+       
     def store(self, path): 
         dst = os.path.join(path, self.metadata.year, self.metadata.month)
         if not os.path.isdir(dst):
             os.makedirs( dst )
-        dst =  os.path.join(dst, "%s-%s_%s" % (self.metadata.year, self.metadata.month, self.filename))
+        dst =  os.path.join(dst, self.filename)
         
         flag = True
         if not os.path.isfile(dst):
@@ -216,7 +273,8 @@ class File:
     def export_to(self, location):
         if not os.path.isfile(location):
             flag = shutil.copy2( self.location, location) == location
-            
+         
+    @io_protect() #la seule à devoir être proteger, du fait de la construction de l'application
     def remove(self):
         if os.path.isfile(self.location):
             os.remove( self.location )
@@ -263,7 +321,7 @@ class FileHandler:
         frame = Frame(self.master, bg="white", width=DISPLAY_WIDTH, height=DISPLAY_HEIGHT)
         
         menu=Frame(frame)
-        b_back = Button(menu, text="Back", command=self.parent.show_pictures)
+        b_back = Button(menu, text="Back", command=self.parent.show_files)
         b_back.pack(side=LEFT);
         b_remove = Button(menu, text="Remove", command=self.remove)
         b_remove.pack(side=LEFT)
@@ -283,7 +341,7 @@ class FileHandler:
         self.picture = ImageTk.PhotoImage(im.resize((width, height), Image.ANTIALIAS))
         
         canvas = Canvas(frame, width=DISPLAY_WIDTH, height=DISPLAY_HEIGHT)
-        canvas.bind('<Escape>', lambda event: self.parent.show_pictures ) 
+        canvas.bind('<Escape>', lambda event: self.parent.show_files ) 
         item = canvas.create_image(0, 0, anchor=NW, image=self.picture) 
 
         canvas.pack()
@@ -312,20 +370,18 @@ class FileHandler:
     def remove(self):#from album
         #if messagebox.askyesno("Warning", "Do you really want to delete this file?"):
         self.parent.remove_file( self._file )
-        self.parent.show_pictures()
+        self.parent.show_files()
 
 def recursion_protect(default=None, f= (lambda x:x)):
     def decorator(function):
         history = {}
         def protect_function(self, *args, **kwargs):
-            print(len(history))
             if f(self) not in history :
                 history[f(self)] = True
                 tmp = function(self, *args, **kwargs)
                 history.clear()
                 return tmp
             else:
-                print("not in")
                 history.clear()
                 return default
         return protect_function
@@ -386,7 +442,6 @@ class Album: #subalbums not fully implemented
     def add_subalbum(self, album):
         self.subalbums[ album ] = True
         album.incr_all()
-        print("adding subalbums")
         
     @recursion_protect()
     def incr_all(self):
@@ -421,7 +476,15 @@ class Album: #subalbums not fully implemented
             
         for album in self.subalbums:
             album.export_to( location )
-        
+    
+    @recursion_protect()    
+    def lock_files(self):
+        for _file in self.files:
+            _file.io_lock.acquire()
+            
+        for album in self.subalbums:
+            album.lock_files()   
+    
     @recursion_protect(0)
     def __len__(self): #number of file in dir and subdir
         return len(self.files) + sum( [len(a) for a in self.subalbums.keys() ] )
@@ -452,7 +515,7 @@ class AlbumHandler:
 
         label = Label(frame, text=self.album.name)
         label.pack()
-        print(self.album.cover)
+
         if self.album.cover :
             photo = ImageTk.PhotoImage(Image.open( self.album.cover.metadata.thumbnail ))
         else:
@@ -511,21 +574,33 @@ class AlbumHandler:
             AlbumHandler(self, self, album).make_treeview(tree, objmap, str(len(objmap)-1) )
             
 class Library:
-    def __init__(self, location):
-        if not os.path.isdir( location ):
+    def __init__(self, location, load=True):
+        if load and not os.path.isdir( location ):
             messagebox.showerror("Error", "Library location : invalid")
         
         self.files = {} # ordered by hash
         self.albums = {} #orderder by id
         self.inner_albums = {}#years, month 
         
+        self.io_lock = threading.Lock()
+        
         self.location = location
         if self.location :
             self.load()
         
+    def __deepcopy__(self, memo):
+        new = Library(self.location, False)
+        
+        new.files = copy.deepcopy( self.files)
+        new.albums = copy.deepcopy( self.albums)
+        new.inner_albums = copy.deepcopy( self.inner_albums)
+        
+        return new
+        
     def __exit__(self):
         self.store()
         
+    @io_protect()
     def load(self):
         files = ["files.lib", "albums.lib", "inner_albums.lib"]
         for filename in files:
@@ -540,10 +615,9 @@ class Library:
             
         with open( os.path.join(self.location, "inner_albums.lib"), 'rb') as f:
             self.inner_albums = pickle.load(f)
-            
+       
+    @io_protect()
     def store(self):
-        print(os.path.join(self.location, "files.lib")) 
-
         with open( os.path.join(self.location, "files.lib"), 'wb') as f:
             pickle.dump(self.files, f, pickle.HIGHEST_PROTOCOL)
             
@@ -552,11 +626,10 @@ class Library:
             
         with open( os.path.join(self.location, "inner_albums.lib"), 'wb') as f:
             pickle.dump(self.inner_albums, f, pickle.HIGHEST_PROTOCOL)
-        
+     
+    @io_protect()
     def add_file(self, _file):
-        print("%d" % len(self.files) )
         if _file.md5 in self.files :
-            print("dedup")
             if _file.metadata == self.files[_file.md5].metadata :
                 return True
             else:
@@ -583,21 +656,36 @@ class Library:
         self.files[_file.md5]= _file
         
     def add_directory(self, location):
+        th = threading.Thread(None, self.inner_add_directory, None, (location,))
+        th.start()
+        
+        return th
+        
+    #don io_protect this
+    def inner_add_directory(self, location):
         for path, dirs, files in os.walk(location):
             for filename in files:
                 if check_ext(filename) :                    
                     tmp = File(filename, os.path.join(path, filename))                    
                     self.add_file( File(filename, os.path.join(path, filename)) )
-                    
+            
+    @io_protect()
     def add_album(self, album):
         self.albums[ album ] =True
         
+    @io_protect()
     def remove_album(self, album):
         if album in self.albums:
             del self.albums[ album ]
             
         album.died = True
-            
+ 
+class Action(Enum):
+    pagination_albums = 1
+    pagination_files = 2
+    display_file = 3
+ 
+        
 class Application(Frame):
     def __init__(self, master=None):
         Frame.__init__(self, master, bg="white")
@@ -628,9 +716,13 @@ class Application(Frame):
         self.inner_right_frame = None
         
         self.last_pagination = None
+        self.action = Action.pagination_albums
         
         self.load()
         self.bind()
+        
+        self.io_threads=[]
+        self.register()
         
     def load(self):
         files = ["general.data"]
@@ -649,12 +741,12 @@ class Application(Frame):
                 self.albums_to_display = general["albums_to_display"]
                 self.parents_album = general["parents_album"]
                 self.current = general["current"]
-                self.last_pagination =[None, self.show_albums, self.show_pictures][general["last_pagination"]]
+                self.last_pagination =[None, self.show_albums, self.show_files][general["last_pagination"]]
         
         if not self.last_pagination and self.library:
             self.albums_to_display = list( self.library.albums.keys() ) 
             self.show_albums()
-        else:
+        elif self.last_pagination:
             self.last_pagination(self.current)
         
     def store(self):
@@ -664,7 +756,7 @@ class Application(Frame):
             'albums_to_display' : self.albums_to_display,
             'parents_album' : self.parents_album,
             'current' : self.current,
-            'last_pagination' : {None:0, self.show_albums:1, self.show_pictures:2}[self.last_pagination]
+            'last_pagination' : {None:0, self.show_albums:1, self.show_files:2}[self.last_pagination]
         }
         with open("general.data", 'wb') as f:
             pickle.dump(general, f, pickle.HIGHEST_PROTOCOL)
@@ -685,6 +777,19 @@ class Application(Frame):
         self.master.bind("<Escape>", escape)
         self.master.bind("<KeyPress>", _keypress_event)
         self.master.bind("<KeyRelease>", _keyrelease_event)
+        
+    def register(self):
+        def _save():
+            self.master.after(300000, _save)
+            self.save()
+        
+        def _refresh():
+            print("refresg")    
+            self.master.after(3000, _refresh) #ms, each 5 minutes
+            self.refresh()
+        
+        self.master.after(300000, _save)
+        self.master.after(3000, _refresh)
         
     def clear_selected(self):
         try: #if already deleted by window,therefore we can keep the hisotry selection after changing page (except if we o nex select)
@@ -719,14 +824,23 @@ class Application(Frame):
         albumhandler.frame_thumbail.configure(bg = "blue")
         self.selected_albums[albumhandler] = True
         self.make_right_panel()
-      
+    
     def clean(self):
+        self.save()
+        for th in self.io_threads:
+            if th.is_alive():
+                th.join()
+      
+    def save(self):
+        self.io_threads = [ th for th in self.io_threads if th.is_alive ]                
         self.save_library()
         self.store()
     
     def save_library(self):
         if self.library :
-            self.library.store()
+            t = threading.Thread(None, (lambda lib : lib.store()), None, (copy.deepcopy(self.library),) )#snapshot
+            t.start()
+            self.io_threads.append(t)
     
     def set_main_frame(self, frame):
         if self.main_frame:
@@ -748,7 +862,6 @@ class Application(Frame):
         self.inner_main_frame.pack()
 
     def display_albums(self, albums, parents_album=[]):
-        print("displaying albums")
         self.clean_sides()
 
         if not self.preprocess() :
@@ -761,7 +874,8 @@ class Application(Frame):
         
         self.postprocess()
         self.last_pagination = self.show_albums
-     
+        self.action = Action.pagination_albums
+        
     def display_files(self, pictures, parents_album=[]):
         self.clean_sides()
 
@@ -774,7 +888,8 @@ class Application(Frame):
         self.make_pagination(self.make_pictures_pagination)
         
         self.postprocess()
-        self.last_pagination = self.show_pictures
+        self.last_pagination = self.show_files
+        self.action = Action.pagination_files
         
     def display_picture(self, picture):
         self.clean_sides()
@@ -789,7 +904,8 @@ class Application(Frame):
         
         self.parents_album.append( self.parents_album[-1] )
         self.postprocess()
-    
+        self.action = Action.display_file
+        
     def set_library_location(self, location=None):
         self.library = Library( filedialog.askdirectory() if not location else location )
         
@@ -808,10 +924,8 @@ class Application(Frame):
         if not location or not os.path.isdir( location ):
             messagebox.showerror("Error", "Source location : not defined")
             return False
-        self.library.add_directory( location )
-        
-        self.display_albums( list( self.library.albums.keys() ) )
-      
+        self.io_threads.append( self.library.add_directory( location ) )
+              
     def export_to(self):
         location = filedialog.askdirectory()
         if not location or not os.path.isdir( location ):
@@ -822,13 +936,26 @@ class Application(Frame):
             messagebox.showerror("Error", "Nothing to export")
             return False
         
-        for handler in self.selected_files:
-            handler._file.export_to(location)
-            
-        for handler in self.selected_albums:
-            handler.album.export_to(location)
         
-    def show_pictures(self, current=0):
+        def _export_to(files, albums):
+            for _file in files:
+                _file.export_to(location)
+                _file.io_lock.release()
+                
+            for album in albums:
+                album.export_to(location)
+             
+        files = copy.deepcopy( [handler._file for handler in self.selected_files] )
+        albums = copy.deepcopy( [handler.album for handler in self.selected_albums])
+        
+        for _file in files:
+            _file.io_lock.acquire()
+
+        th = threading.Thread(None, _export_to, None, ( files, albums))
+        th.start()
+        self.io_threads.append(th)
+        
+    def show_files(self, current=0):
         self.current = current
         
         if self.parents_album :
@@ -836,8 +963,8 @@ class Application(Frame):
         else:
             self.display_files([], [])
         
-        self.last_pagination = self.show_pictures
-        print("savedhghgggggggggggggggggggggggggggggggggggggggggg")
+        self.last_pagination = self.show_files
+        self.action = Action.pagination_files
         
     def show_albums(self, current=0):
         self.current = current
@@ -845,6 +972,7 @@ class Application(Frame):
         self.display_albums(self.albums_to_display, [])
     
         self.last_pagination = self.show_albums
+        self.action = Action.pagination_albums
      
     def clean_sides(self):
         if self.inner_right_frame:
@@ -860,7 +988,6 @@ class Application(Frame):
         
         self.clean_sides()
         
-        print("back reste %d" % len(self.parents_album))
         if not self.parents_album:
             self.albums_to_display = list(self.library.albums)
         else:
@@ -896,7 +1023,6 @@ class Application(Frame):
                     break
                 tmp = AlbumHandler(self, pagination.interior, self.albums_to_display[ offset + i*width + j]).make_thumbnail()
                 tmp.grid(row=i, column=j)
-            print(j)
             if j != width-1 :
                 break
         pagination.pack_propagate(False)
@@ -912,8 +1038,8 @@ class Application(Frame):
  
         b_add_dir = Button(menu, text="Add album", command= self.build_add_album )
         b_add_dir.pack(side=LEFT)
-        b_show_pictures = Button(menu, text="Show pictures", command= self.show_pictures )
-        b_show_pictures.pack(side=LEFT)
+        b_show_files = Button(menu, text="Show pictures", command= self.show_files )
+        b_show_files.pack(side=LEFT)
         b_show_albums = Button(menu, text="Show albums", command= self.show_albums )
         b_show_albums.pack(side=LEFT)
         menu.pack()
@@ -1123,18 +1249,28 @@ class Application(Frame):
 
         self.show_albums()
         
-    def refresh_pagination(self):
-        self.last_pagination(self.current)
-
+    def refresh(self):
+        if self.action == Action.pagination_files:
+            self.show_files(self.current)
+        elif self.action == Action.pagination_albums:
+            if not self.parents_album:
+                self.albums_to_display = list(self.library.albums)
+            else:
+                self.albums_to_display = list(self.parents_album[-1].subalbums)
+                
+            self.show_albums(self.current)
+        elif self.action == Action.display_file:
+            pass
+        
     def next_page(self):
         self.current += 1
-        self.refresh_pagination()
+        self.refresh()
         
     def previous_page(self):
         self.current -= 1
-        self.refresh_pagination()
+        self.refresh()
         
-    def remove_file(self, _file, handler=None, refresh=False):
+    def remove_file(self, _file, handler=None, refresh=False):#surtout pas de thread io
         self.parents_album[-1].remove_file( _file, self.library.files )
         
         if handler in self.selected_files:
@@ -1143,10 +1279,10 @@ class Application(Frame):
         if _file in self.files_to_display:
             self.files_to_display.remove(_file)
         
-        if refresh:
-            self.refresh_pagination()
+
+        self.refresh()
             
-    def remove_album(self, album, handler=None, refresh=False):
+    def remove_album(self, album, handler=None, refresh=False):#surtout pas de thread io
         album.remove_all(self.library.files)
 
         if self.parents_album:
@@ -1160,8 +1296,7 @@ class Application(Frame):
         if album in self.albums_to_display:#O(n), cannot be improve ..
             self.albums_to_display.remove( album )
             
-        if refresh:
-            self.refresh_pagination()
+        self.refresh()
             
 window = Tk()
 #window.bind("<KeyPress>", lambda event: print("key pressed %d" % event.keycode))

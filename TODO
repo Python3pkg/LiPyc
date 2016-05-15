@@ -1,6 +1,9 @@
--> thread i/o 
+-> refresh perdiodique + bouton
 -> search
 -> album/image tag 
 -> file sorting
 -> redraw improvement
 -> set cover
+-> Suprr key
+-> remove suppression si on demande suppression définitive on affiche la photo et le nom
+-> quand annuler export,importload pas de message d'erreur
