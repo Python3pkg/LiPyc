@@ -782,8 +782,6 @@ class Application(Frame):
         self.library = None
         self.init()
         
-        #self.files_to_display = []
-        #self.albums_to_display = []
         self.parents_album = [] #if we are in subalbums for insertion supression etc
         
         self.selected_files = {} #store filehandler
@@ -792,11 +790,8 @@ class Application(Frame):
 
 
         
-        #self.left_panel = Frame(self, borderwidth=1, width=250, height=700)
         self.left_panel = Frame(self, borderwidth=1)
-        #self.left_panel.pack(side = LEFT, fill=None, expand=False)
         self.left_panel.pack(side = LEFT)
-        #self.left_panel.pack(side=LEFT)
 
         
         self.current = 0 #page number   
@@ -818,10 +813,6 @@ class Application(Frame):
         self.bottom_panel = Frame(self.main_panel)
         self.bottom_panel.pack()
         self.certificat_bottom  = None
-                
-        #self._right_panel = Frame(self,  borderwidth=1, width=400, height=700)
-        #self._right_panel.pack(side = LEFT, fill=None, expand=False)
-        #self._right_panel.pack()
         
         self.right_panel = Frame(self,  borderwidth=1, width=400, height=700)
         self.right_panel.pack()
@@ -833,8 +824,6 @@ class Application(Frame):
         self.right_action=Frame(self.right_panel)
         self.certificat_right_action=None
         
-        
-        #self.last_pagination = None
         self.action = Action.pagination_albums
         
         self.load()
@@ -856,24 +845,18 @@ class Application(Frame):
                 if general["library_location"] and os.path.isdir( general["library_location"] ):
                     self.library = Library(general["library_location"])
                     
-                #self.files_to_display = general["files_to_display"]
-                #self.albums_to_display = general["albums_to_display"]
                 self.parents_album = general["parents_album"]
                 self.current = general["current"]
                 self.action = general["action"]
-                #self.last_pagination =[None, self.show_albums, self.show_files][general["last_pagination"]]
          
         self.refresh()
         
     def store(self):
         general={
             'library_location' : self.library.location if self.library else None,
-            #'files_to_display' : self.files_to_display,
-            #'albums_to_display' : self.albums_to_display,
             'parents_album' : self.parents_album,
             'current' : self.current,
             'action' : self.action,
-            #'last_pagination' : {None:0, self.show_albums:1, self.show_files:2}[self.last_pagination]
         }
         with open("general.data", 'wb') as f:
             pickle.dump(general, f, pickle.HIGHEST_PROTOCOL)
@@ -957,16 +940,6 @@ class Application(Frame):
             t = threading.Thread(None, (lambda lib : lib.store()), None, (copy.deepcopy(self.library),) )#snapshot
             t.start()
             self.io_threads.append(t)
-    #def preprocess(self):
-        #if not self.library:
-            #return False
-            
-        #if self.inner_center_panel :
-            #self.inner_center_panel.destroy()
-            
-        #self.inner_center_panel = Frame( self.center_panel, bg="white")
-        #return True
-        
 
 #### Begin Views
     def display_albums(self, albums, parents_album=[]):
@@ -994,10 +967,6 @@ class Application(Frame):
         ## End CenterPanel
         
         self.make_pagination(len(albums))
-
-        
-        #self.postprocess()
-        #self.last_pagination = self.show_albums
         
     def display_files(self, files, parents_album=[]):
         if not self.library:
@@ -1026,7 +995,6 @@ class Application(Frame):
         
         self.make_pagination(len(files))
         
-        #self.last_pagination = self.show_files
         
     def display_file(self, _file):
         if not self.library:
@@ -1166,25 +1134,7 @@ class Application(Frame):
             
             self.top_panel.pack()
         ## End TopPanel
-        
-        
-        #### Begin TopMenu ###
-        #menu = Frame(self.inner_center_panel)   
-        #if self.parents_album : 
-            #b_back = Button(menu, text="Back", command= self.back )
-            #b_back.pack(side=LEFT)
- 
-        #b_add_dir = Button(menu, text="Add album", command= self.build_add_album )
-        #b_add_dir.pack(side=LEFT)
-        #b_show_files = Button(menu, text="Show pictures", command= self.show_files )
-        #b_show_files.pack(side=LEFT)
-        #b_show_albums = Button(menu, text="Show albums", command= self.show_albums )
-        #b_show_albums.pack(side=LEFT)
-        #menu.pack()
-        #### End TopMenu ###
-        
-        #pagination.pack()
-                
+                        
         ## BottomPanel
         certificat_bottom = (self.action, 
             self.parents_album[-1] if self.parents_album else None,
@@ -1211,25 +1161,6 @@ class Application(Frame):
             self.bottom_panel.pack()
         ## End BottomPanel
                 
-        #### Begin BottomMenu ###
-        #nm = height*width
-        #offset = self.current * nm
-        
-        #nav = Frame( self.inner_center_panel, bg="white")
-        #label = Label(nav, text="Page : %d/%d" % (self.current + 1, 1 + number/nm) )
-        #label.pack(side=LEFT)
-        
-        #if self.current > 0:
-            #b_previous = Button(nav, text="Previous", command=self.previous_page)
-            #b_previous.pack(side=LEFT)
-        
-        #if self.current < int(number/nm):
-            #b_next = Button(nav, text="Next", command=self.next_page)
-            #b_next.pack(side=LEFT)
-        #nav.pack() 
-        #nav.pack()
-        #### End BottomMenu ###
-        
         self.make_pagination_right_panel()
         
     def make_pagination_right_panel(self):
@@ -1238,13 +1169,11 @@ class Application(Frame):
             self.parents_album[-1] if self.parents_album else None,
             
             len(self.selected_albums), 
-            #sum([id(handler) for handler in self.selected_albums]),
             [handler for handler in self.selected_albums],
             sum([ len(handler.album) for handler in self.selected_albums] ),
             list(self.selected_albums.keys())[0].certificat_info() if len( self.selected_albums ) == 1 else None,
             
             len(self.selected_files), 
-            #sum([id(handler) for handler in self.selected_files]),
             [handler for handler in self.selected_files],
             list(self.selected_files.keys())[0].certificat_info() if len( self.selected_files ) == 1 else None,
         )
@@ -1257,68 +1186,6 @@ class Application(Frame):
             self.make_pagination_right_info()
             self.right_info.pack()
         
-        ### Begin right panel ###
-        #info1 = Frame(self.inner_right_panel)
-        #info1.pack(pady=5)
-
-        #if len(self.selected_albums)>1 :
-            #label = Label(info1, text="Album%s selected :" % ("s" if len(self.selected_albums)>1 else "") )
-            #label.pack()
-            
-            #number = Label(info1, text="Number : %d " % len(self.selected_albums) )
-            #number.pack()
-            
-            #deep_number = Label(info1, text="Number : %d " % sum([ len(handler.album) for handler in self.selected_albums] ) )
-            #deep_number.pack()
-            
-            #sep2 = ttk.Separator( info1, orient='horizontal')
-            #sep2.pack(padx = 5, pady = 5)
-        #elif len(self.selected_albums)==1 :
-            #handler = list(self.selected_albums.keys())[0]
-            
-            #label = Label(info1, text="Album informations :")
-            #label.pack()
-            
-            #album_info = handler.make_info(info1)
-            #album_info.pack()
-            
-            
-            #f_rename = Frame(info1)
-            #f_rename.pack(side=LEFT)
-            
-            #b_rename = Button(f_rename, text="Rename", command= (lambda _=None :self.make_rename_album(handler, f_rename)) )
-            #b_rename.pack()
-            #b_rm_album = Button(info1, text="Remove", command= (lambda _=None : self.remove_album(handler.album, handler, True)) )
-            #b_rm_album.pack()
-        #else:
-            #pass
-            
-        #info2 = Frame(self.inner_right_panel)
-        #info2.pack(pady=5)
-        
-        #if len(self.selected_files)>1:
-            #label = Label(info2, text="File%s selected :" % ("s" if len(self.selected_files)>1 else "") )
-            #label.pack()
-            
-            #number = Label(info2, text="Number : %d " % len(self.selected_files) )
-            #number.pack()
-            
-            #sep2 = ttk.Separator( info2, orient='horizontal')
-            #sep2.pack(padx = 5, pady = 5)
-        #elif len(self.selected_files)==1 :
-            #handler = list(self.selected_files.keys())[0]
-            
-            #label = Label(info1, text="File informations :")
-            #label.pack()
-            
-            #file_info = handler.make_info(info1)
-            #file_info.pack()
-            
-            #b_rm_file = Button(info2, text="Remove", command= (lambda _=None : self.remove_file(handler._file, handler, True)) )
-            #b_rm_file.pack()
-        #else:
-            #pass
-            
         #### ActionPanel
         #Check tree change
         tmp_albums = self.parents_album[-1].subalbums if self.parents_album else self.library.albums
@@ -1329,8 +1196,6 @@ class Application(Frame):
             len(tmp_albums), len(tmp_files),
             sum([id(album) for album in tmp_albums]),
             sum([id(_file) for _file in tmp_files]),
-            #sum([id(handler) for handler in self.selected_albums.keys()]),
-            #sum([id(handler._file) for handler in self.selected_files])
             [handler for handler in self.selected_albums.keys()],
             [handler for handler in self.selected_files]
         )
@@ -1444,11 +1309,6 @@ class Application(Frame):
         clean_frame( frame )
         frame.pack(side=LEFT)
         
-        #if self.inner_left_panel :
-            #self.inner_left_panel.destroy()
-            
-        #self.inner_left_panel = Frame(self.left_panel)
-        
         name = StringVar() 
         name.set("Album name")
         name_entry = Entry(frame, textvariable=name, width=10)
@@ -1479,10 +1339,8 @@ class Application(Frame):
 ## Begin Event Handling
 #### Begin TopPanel
     def back(self):
-        #self.files_to_display = []
         self.parents_album.pop()
         self.current = 0
-        #self.clean_sides()
         self.action = Action.pagination
         self.refresh()
           
@@ -1512,9 +1370,7 @@ class Application(Frame):
             self.display_files( list(self.parents_album[-1].files.keys()), [])
         else:
             self.display_files([], [])
-        
-        #self.last_pagination = self.show_files
-        
+                
     def show_albums(self, current=0):
         self.current = current
         self.action = Action.pagination_albums
@@ -1523,9 +1379,7 @@ class Application(Frame):
             self.display_albums( list(self.parents_album[-1].subalbums.keys()), [])
         else:
             self.display_albums(list(self.library.albums.keys()), [])
-        #self.display_albums(self.albums_to_display, [])
-    
-        #self.last_pagination = self.show_albums
+
 #### Begin TopPanel
 
 
@@ -1541,8 +1395,6 @@ class Application(Frame):
         
         self.action = Action.pagination
         self.refresh()
-        #self.albums_to_display = list( self.library.albums.keys() ) 
-        #self.show_albums()
 
     def import_directory(self):
         location = filedialog.askdirectory()
@@ -1643,20 +1495,6 @@ class Application(Frame):
     def init(self):
         pass
     
-      
-
-    #def clean_sides(self):
-        #if self.inner_right_panel:
-            #self.inner_right_panel.destroy()
-            
-        #if self.inner_left_panel:
-            #self.inner_left_panel.destroy()
-            
-
-  
-
-        
-   
     def rename_album(self, name):
         if not name :
             messagebox.showerror("Error", "Invalid name for album name")
@@ -1695,9 +1533,6 @@ class Application(Frame):
         
         if handler in self.selected_files:
             del self.selected_files[handler]
-        
-        #if _file in self.files_to_display:
-            #self.files_to_display.remove(_file)
         
         if refresh:
             self.refresh()
