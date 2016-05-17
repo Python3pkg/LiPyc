@@ -387,7 +387,8 @@ class FileHandler:
         self.picture = ImageTk.PhotoImage(im.resize((width, height), Image.ANTIALIAS))
         
         canvas = Canvas(frame, width=DISPLAY_WIDTH, height=DISPLAY_HEIGHT)
-        canvas.bind('<Escape>', lambda event: self.parent.show_files ) 
+        #canvas.bind('<Escape>', lambda event: self.parent.show_files ) 
+        canvas.bind('<Escape>', lambda event: self.parent.back ) 
         item = canvas.create_image(0, 0, anchor=NW, image=self.picture) 
 
         canvas.pack()
@@ -1445,8 +1446,7 @@ class Application(Frame):
     #       Never done deepcopy on a file, and use it as usual,
     #    such a deecopy will disable the garbage collector for  the new object
     
-    def add_to(self, frame, parent_album):
-        frame.destroy()
+    def add_to(self,  parent_album):
         
         for handler in self.selected_albums.keys():
             parent_album.add_subalbum( handler.album )
@@ -1454,8 +1454,7 @@ class Application(Frame):
         for handler in self.selected_files.keys():
             parent_album.add_file( handler._file )
             
-    def copy_to(self, frame, parent_album):
-        frame.destroy()
+    def copy_to(self, parent_album):
         
         for handler in self.selected_albums.keys():
             parent_album.add_subalbum( copy.deepcopy( handler.album ) )
@@ -1463,9 +1462,7 @@ class Application(Frame):
         for handler in self.selected_files.keys():
             parent_album.add_file( handler._file )
         
-    def move_to(self, frame, parent_album):
-        frame.destroy()
-        
+    def move_to(self, parent_album):        
         for handler in self.selected_albums.keys():
             parent_album.add_subalbum( handler.album )
             self.remove_album( handler.album )
@@ -1552,10 +1549,13 @@ class Application(Frame):
             self.refresh()
             
 window = Tk()
-
+#help(window)
+#raise Exception("")
 app = Application( master=window)
 app.pack(padx=30, pady=30)
-
+#frame = Label(window, text="Coucou", bg="white")
+#frame.pack()
+#frame.configure(text="Hello")
 menubar = TopMenu( window, app)
 
 progress=ttk.Progressbar(window, mode="determinate", length="500", value=50, maximum=100)
@@ -1574,3 +1574,4 @@ def on_closing():
 
 window.protocol("WM_DELETE_WINDOW", on_closing)
 window.mainloop()
+

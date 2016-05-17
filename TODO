@@ -8,3 +8,4 @@
 -> quand annuler export,importload pas de message d'erreur
 -> loadbalancing entre (library, pool of library)
 -> replication entre (library, pool of library
+-> problem surcharge deepcopy, garbage collector and move_to and add_to and copy_to
