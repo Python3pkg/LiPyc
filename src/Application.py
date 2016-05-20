@@ -414,8 +414,7 @@ class Application(Tk):
     def remove_file(self, _file, refresh=False):#surtout pas de thread io
         self.parents_album[-1].remove_file( _file, self.library.files )
         
-        if _file in self.selected:
-            del self.selected[handler]
+        self.selected.discard(_file)
         
         if refresh:
             self.refresh()
@@ -425,11 +424,9 @@ class Application(Tk):
 
         if self.parents_album:
             self.parents_album[-1].remove_subalbum( album )
-        else:
-            self.library.remove_album( album )
+        self.library.remove_album( album )
         
-        if handler in self.selected:
-            del self.selected[handler]
+        self.selected.discard( album )
            
         self.rightPanel.actionPanel.set()
         if refresh:

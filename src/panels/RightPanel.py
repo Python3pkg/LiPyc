@@ -179,8 +179,8 @@ class RightPanel(Panel):
         ])
         
         def _remove():
-            self.remove_file(obj, True)
-            self.back()
+            self.app.remove_file(obj, True)
+            self.app.back()
         self.infoPanel.set_buttons( ["Remove"], [_remove] )
         
         self.infoPanel.show()
@@ -199,7 +199,7 @@ class RightPanel(Panel):
             ]
             buttons_texts = ["Remove"]
             callbacks = [
-                lambda _=None : self.app.remove_album(obj, True)
+                lambda _=None : self.app.remove_file(obj, True)
             ]
         else:
             labels_texts= [

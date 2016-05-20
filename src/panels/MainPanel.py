@@ -174,15 +174,24 @@ class Tile(Panel):
         self.selected = False
         self.data = None
         
-        self.thumbnail = Canvas(self, width=THUMBNAIL_WIDTH, height=THUMBNAIL_HEIGHT)
+        self.thumbnail = Canvas(self, bg="white", width=THUMBNAIL_WIDTH, height=THUMBNAIL_HEIGHT)
         self.thumbnail.pack()
         self.title = Label(self)
         self.title.pack()
-
-    def set_album(self, album):  
-        self.title.configure(text=album.name)
-        self.title.pack()
-        
+    
+    def show(self):
+        #self.grid(row=self.i, column=self.j)
+        if self.obj :
+            if isinstance(self.obj, Album):
+                self.title.pack()
+            self.thumbnail.pack()
+    
+    def hide(self):
+        self.configure(bg="white")
+        self.title.pack_forget()
+        self.thumbnail.pack_forget()
+    
+    def set_album(self, album):          
         if album.cover :
             self.data = ImageTk.PhotoImage(Image.open( album.cover.metadata.thumbnail ))
         else:
@@ -192,6 +201,8 @@ class Tile(Panel):
             self.app.parents_album.append(album)
             self.app.action = Action.pagination
             self.app.refresh()
+        
+        self.title.configure(text=album.name)
         
         return _display, lambda event : self.app.select( album )
             
@@ -235,7 +246,7 @@ class Tile(Panel):
         
 class PaginationPanel(VScrolledPanel):
     def __init__(self, app, master, num_x, num_y, *args, **kwargs):
-        super().__init__(master, *args, **kwargs)
+        super().__init__(master, bg="white", *args, **kwargs)
         
         self.num_x = num_x
         self.num_y = num_y
@@ -245,7 +256,9 @@ class PaginationPanel(VScrolledPanel):
         self.tiles=[ Tile(app, self.interior) for j in range(num_x*num_y) ]
         for j in range(num_y):
             for i in range(num_x):
-                self.tiles[j * num_x + i].grid(row=j, column=i)
+                self.tiles[i * num_y + j].grid(row=i, column=j)
+                self.tiles[i * num_y + j].i=i
+                self.tiles[i * num_y + j].j=j
          
         self.sort_functions={
             "name":{
@@ -264,12 +277,12 @@ class PaginationPanel(VScrolledPanel):
         for i in range(self.last_len):
             self.tiles[i].refresh()
                 
-    def set(self, objs, sortname="name"):
-        print( "Pagination of %d" %len(objs))
-        
+    def set(self, objs, sortname="name"):        
         if objs:
             objs.sort( key=self.sort_functions[sortname][type(objs[0])] )
-        
+        self.reset()
+
+        print("objs len %d"% len(objs))
         for i in range(0, min(len(objs), len(self.tiles))):
             self.tiles[i].set( objs[i] )
             self.tiles[i].show()

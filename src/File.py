@@ -19,6 +19,8 @@ from lipyc.utility import io_protect, check_ext, img_exts
 from lipyc.Version import Versionned
 from lipyc.config import *
 
+from ctypes import c_int
+
 class FileMetadata:
     def __init__(self, parent = None):
         self.parent = parent
@@ -97,7 +99,7 @@ class File(Versionned):
         if location and filename and not self.extracted:
             self.extract()
         
-        self.garbage_number = 0 #if 0 then data suppressed
+        self.garbage_number = c_int(0) #if 0 then data suppressed
         
         self.io_lock = threading.Lock() #pour gérer les export concurrant à une suppression si wait vérouiller on ne peut pas supprimer
 
@@ -105,7 +107,8 @@ class File(Versionned):
         new = File(self.filename, self.location)
         new.md5 = self.md5
         new.metadata = self.metadata.__deepcopy__(None, new)
-        new.garbage_number = None #sort du garbage collector si on le copie
+        new.garbage_number = self.garbage_number #danger
+        #logging.warning("Warning", "Using file deepcopy, you must ensure that garbage collector is still right")
         new.extracted = self.extracted #sort du garbage collector si on le copie
         new.io_lock = self.io_lock
         
@@ -122,8 +125,9 @@ class File(Versionned):
     
     def extract(self):
         self.extracted = True
-        self.md5 = hashlib.md5(open(self.location, "rb").read()).hexdigest()
-        self.metadata.extract()
+        with open(self.location, "rb") as f:
+            self.md5 = hashlib.md5(f.read()).hexdigest()
+            self.metadata.extract()
     
     def create_thumbnails(self):
         if check_ext(self.filename, img_exts):

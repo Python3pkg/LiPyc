@@ -1,11 +1,10 @@
 -> search
 -> album/image tag 
 -> file sorting
--> redraw improvement
 -> set cover
 -> Suprr key
 -> remove suppression si on demande suppression définitive on affiche la photo et le nom
 -> quand annuler export,importload pas de message d'erreur
 -> loadbalancing entre (library, pool of library)
 -> replication entre (library, pool of library
--> problem surcharge deepcopy, garbage collector and move_to and add_to and copy_to
+-> move_to and add_to and copy_to

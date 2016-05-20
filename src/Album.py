@@ -14,6 +14,8 @@ from enum import Enum
 from lipyc.utility import recursion_protect
 from lipyc.Version import Versionned
 
+from tkinter import messagebox
+
 class Album(Versionned): #subalbums not fully implemented
     def __init__(self, name=None, datetime=None):
         super().__init__()
@@ -36,24 +38,24 @@ class Album(Versionned): #subalbums not fully implemented
         if self.cover == None:
             self.cover = _file
             
-        _file.garbage_number += 1
+        _file.garbage_number.value += 1
         self.files[ _file ] = True
         
     def remove_file(self, _file, md5map):#va falloir enrichir le msg
-        if _file.garbage_number == 1 and not messagebox.askyesno("Warning", "This is the last copy of this picture, do you really want to remove it ?"):
+        if _file.garbage_number.value == 1 and not messagebox.askyesno("Warning", "This is the last copy of this picture %s, do you really want to remove it ?" % _file.filename):
             return None
             
         if _file in self.files:
             del self.files[_file]
         
-        _file.garbage_number -= 1
+        _file.garbage_number.value -= 1
         
         if self.files and _file == self.cover:
             self.cover = random.choice(list(self.files.keys()))
         elif not self.files:
             self.cover = None
         
-        if _file.garbage_number == 0:
+        if _file.garbage_number.value == 0:
             del md5map[_file.md5]
             _file.remove()
     
@@ -75,7 +77,7 @@ class Album(Versionned): #subalbums not fully implemented
     @recursion_protect()
     def incr_all(self):
         for _file in self.files:
-            _files.garbage_number += 1
+            _files.garbage_number.value += 1
         
         for album in self.subalbums:
             album.incr_all()
@@ -83,11 +85,11 @@ class Album(Versionned): #subalbums not fully implemented
     @recursion_protect()
     def decr_all(self): 
         for _file in self.files:
-            _files.garbage_number -= 1
+            _files.garbage_number.value -= 1
         
         for album in self.subalbums:
             album.decr_all()
-            
+    
     def remove_subalbum(self, album):
         if album in self.subalbums:
             album.died = True #only used for inner_album
