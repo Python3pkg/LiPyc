@@ -22,38 +22,31 @@ class Album(Versionned): #subalbums not fully implemented
         
         self.name = name
         self.datetime = datetime if datetime else time.gmtime()
-        self.subalbums = {}
+        self.subalbums = set()
         
         self.cover = None
-        self.files = {} #order by id
-        self.died = False #use if inner, because it will persiste vene affter deeleteion
-        
-    def alive(self):
-        return not self.died
+        self.files = set() #order by id
+        self.inner_keys = [] #use for inner albums
         
     def rename(self, name):
         self.name = name
         
-    def add_file(self, _file):
-        if self.cover == None:
-            self.cover = _file
+    def add_file(self, _file, path):
+        if self.cover == None and  _file.metadata.thumbnail :
+            if not os.path.isdir( os.path.join( path, ".cover")):
+                os.makedirs( os.path.join( path, ".cover") )
+            self.cover = os.path.join( path, ".cover" , str(id(self)) + ".thumbnail")
+            shutil.copy2(_file.metadata.thumbnail, self.cover)
             
         _file.garbage_number.value += 1
-        self.files[ _file ] = True
+        self.files.add(_file)
         
     def remove_file(self, _file, md5map):#va falloir enrichir le msg
         if _file.garbage_number.value == 1 and not messagebox.askyesno("Warning", "This is the last copy of this picture %s, do you really want to remove it ?" % _file.filename):
             return None
             
-        if _file in self.files:
-            del self.files[_file]
-        
+        self.files.discard(_file)
         _file.garbage_number.value -= 1
-        
-        if self.files and _file == self.cover:
-            self.cover = random.choice(list(self.files.keys()))
-        elif not self.files:
-            self.cover = None
         
         if _file.garbage_number.value == 0:
             del md5map[_file.md5]
@@ -61,23 +54,22 @@ class Album(Versionned): #subalbums not fully implemented
     
     @recursion_protect()
     def remove_all(self, md5map):
-        for album in list(self.subalbums.keys()):
+        for album in list(self.subalbums):
             album.remove_all(md5map)
-            album.died = True
         self.subalbums.clear()
         
-        for _file in list(self.files.keys()):
+        for _file in list(self.files):
             self.remove_file(_file, md5map)
         self.files.clear()
         
     def add_subalbum(self, album):
-        self.subalbums[ album ] = True
+        self.subalbums.add( album )
         album.incr_all()
         
     @recursion_protect()
     def incr_all(self):
         for _file in self.files:
-            _files.garbage_number.value += 1
+            _file.garbage_number.value += 1
         
         for album in self.subalbums:
             album.incr_all()
@@ -92,10 +84,12 @@ class Album(Versionned): #subalbums not fully implemented
     
     def remove_subalbum(self, album):
         if album in self.subalbums:
-            album.died = True #only used for inner_album
             album.decr_all()
-            del self.subalbums[album]
-           
+            
+            if album.cover :
+                os.remove( album.cover)
+            self.subalbums.discard( album )
+    
     @recursion_protect()
     def export_to(self, path):
         location = os.path.join(path, self.name)
@@ -118,5 +112,5 @@ class Album(Versionned): #subalbums not fully implemented
     
     @recursion_protect(0)
     def __len__(self): #number of file in dir and subdir
-        return len(self.files) + sum( [len(a) for a in self.subalbums.keys() ] )
+        return len(self.files) + sum( [len(a) for a in self.subalbums ] )
    

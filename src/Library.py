@@ -26,7 +26,7 @@ class Library:
             messagebox.showerror("Error", "Library location : invalid")
         
         self.files = {} # ordered by hash
-        self.albums = {} #orderder by id
+        self.albums = set() #orderder by id
         self.inner_albums = {}#years, month 
         
         self.io_lock = threading.Lock()
@@ -89,20 +89,21 @@ class Library:
         _file.store(self.location)
         year, month =  (_file.metadata.year, _file.metadata.month)
         
-        if (year, month) not in self.inner_albums or not self.inner_albums[ (year, month) ].alive():
-            if year not in self.inner_albums or not self.inner_albums[ year ].alive():
+        if (year, month) not in self.inner_albums:
+            if year not in self.inner_albums:
                 y_album = Album( year )
+                y_album.inner_keys = [year]
                 self.inner_albums[ year ] = y_album
-                self.albums[ y_album ] = True
+                self.albums.add( y_album )
             else:
                 y_album = self.inner_albums[ year ]
             
             m_album = Album( month )
+            m_album.inner_keys = [y_album.inner_keys[0], month]
             y_album.add_subalbum( m_album )
 
             self.inner_albums[ (year, month) ] = m_album
-        
-        self.inner_albums[ (year, month) ].add_file( _file )
+        self.inner_albums[ (year, month) ].add_file( _file, self.location)
         self.files[_file.md5]= _file
         
     def add_directory(self, location):
@@ -121,12 +122,21 @@ class Library:
             
     @io_protect()
     def add_album(self, album):
-        self.albums[ album ] =True
+        self.albums.add( album )
         
     @io_protect()
     def remove_album(self, album):
+        if len( album.inner_keys ) == 2 :
+            del self.inner_albums[ (album.inner_keys[0], album.inner_keys[1]) ]
+        elif len( album.inner_keys ) == 1:
+            del self.inner_albums[ album.inner_keys[0]]
+        
         if album in self.albums:
-            del self.albums[ album ]
-            
-        album.died = True
+            self.albums.discard( album )
+            album.decr_all()
+            if album.cover :
+                os.remove( album.cover )
+                
+
+
  

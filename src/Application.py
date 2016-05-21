@@ -165,7 +165,7 @@ class Application(Tk):
 #### Begin Views
     def display_albums(self, albums):
         self.action = Action.pagination_albums
-        print("Displaying %d album", len(albums))
+
         self.mainPanel.set_pagination(albums)
         self.leftPanel.set_pagination(albums)
         self.rightPanel.set_pagination(self.selected)
@@ -261,7 +261,7 @@ class Application(Tk):
         self.action = Action.pagination_files
 
         if self.parents_album :
-            self.display_files( list(self.parents_album[-1].files.keys()))
+            self.display_files( self.parents_album[-1].files)
         else:
             self.display_files([])
                 
@@ -270,9 +270,9 @@ class Application(Tk):
         self.action = Action.pagination_albums
         
         if self.parents_album :
-            self.display_albums( list(self.parents_album[-1].subalbums.keys()))
+            self.display_albums( self.parents_album[-1].subalbums)
         else:
-            self.display_albums(list(self.library.albums.keys()))
+            self.display_albums(self.library.albums)
 
 #### Begin TopPanel
 
@@ -341,29 +341,27 @@ class Application(Tk):
     #    such a deecopy will disable the garbage collector for  the new object
     
     def add_to(self,  parent_album):
-        
-        for handler in self.selected_albums.keys():
-            parent_album.add_subalbum( handler.album )
-            
-        for handler in self.selected_files.keys():
-            parent_album.add_file( handler._file )
-            
+        for obj in self.selected:
+            if isinstance(obj, Album):
+                parent_album.add_subalbum( obj )
+            else:
+                parent_album.add_file( obj, self.library.location )
+                
     def copy_to(self, parent_album):
-        
-        for handler in self.selected_albums.keys():
-            parent_album.add_subalbum( copy.deepcopy( handler.album ) )
-            
-        for handler in self.selected_files.keys():
-            parent_album.add_file( handler._file )
+        for obj in self.selected:
+            if isinstance(obj, Album):
+                parent_album.add_subalbum( copy.deepcopy( obj ) )
+            else:
+                parent_album.add_file( obj, self.library.location )
         
     def move_to(self, parent_album):        
-        for handler in self.selected_albums.keys():
-            parent_album.add_subalbum( handler.album )
-            self.remove_album( handler.album )
-            
-        for handler in self.selected_files.keys():
-            parent_album.add_file( handler._file )
-            self.remove_file( handler._file )
+        for obj in list(self.selected):
+            if isinstance(obj, Album):
+                parent_album.add_subalbum( obj  )
+                self.remove_album( obj )
+            else:
+                parent_album.add_file( obj, self.library.location )
+                self.remove_file( obj )
         
 ###### End ActionPanel
 
@@ -409,17 +407,17 @@ class Application(Tk):
     def refresh(self):
         s = default_timer()
         self._refresh()
-        print("Refresh duration %f",  default_timer()-s)
+        #print("Refresh duration %f",  default_timer()-s)
    
     def remove_file(self, _file, refresh=False):#surtout pas de thread io
         self.parents_album[-1].remove_file( _file, self.library.files )
         
         self.selected.discard(_file)
-        
+    
         if refresh:
             self.refresh()
             
-    def remove_album(self, album, handler=None, refresh=False):#surtout pas de thread io
+    def remove_album(self, album, refresh=False):#surtout pas de thread io
         album.remove_all(self.library.files)
 
         if self.parents_album:
@@ -431,4 +429,12 @@ class Application(Tk):
         self.rightPanel.actionPanel.set()
         if refresh:
             self.refresh()
- 
+    
+    def remove(self, objs):
+        for obj in list(objs):
+            if isinstance(obj, Album):
+                self.remove_album(obj)
+            else:
+                self.remove_file(obj)
+                
+        self.refresh()

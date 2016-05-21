@@ -182,18 +182,18 @@ class Tile(Panel):
     def show(self):
         #self.grid(row=self.i, column=self.j)
         if self.obj :
+            self.thumbnail.pack()
             if isinstance(self.obj, Album):
                 self.title.pack()
-            self.thumbnail.pack()
     
     def hide(self):
         self.configure(bg="white")
         self.title.pack_forget()
         self.thumbnail.pack_forget()
     
-    def set_album(self, album):          
+    def set_album(self, album):  
         if album.cover :
-            self.data = ImageTk.PhotoImage(Image.open( album.cover.metadata.thumbnail ))
+            self.data = ImageTk.PhotoImage(Image.open( album.cover ))
         else:
             self.data = ImageTk.PhotoImage(DEFAULT_ALBUM_DATA)
             
@@ -209,7 +209,7 @@ class Tile(Panel):
     def set_file(self, _file):  
         self.title.pack_forget()
         
-        if _file.location :
+        if _file.metadata.thumbnail :
             self.data = ImageTk.PhotoImage(Image.open( _file.metadata.thumbnail ))
         else:
             self.data = ImageTk.PhotoImage(DEFAULT_FILE_DATA)
@@ -279,7 +279,10 @@ class PaginationPanel(VScrolledPanel):
                 
     def set(self, objs, sortname="name"):        
         if objs:
-            objs.sort( key=self.sort_functions[sortname][type(objs[0])] )
+            tmp = objs.pop()
+            objs.add( tmp )
+            objs = sorted( objs, key=self.sort_functions[sortname][type(tmp)])
+            #objs.sort( key=self.sort_functions[sortname][type(objs[0])] )
         self.reset()
 
         print("objs len %d"% len(objs))

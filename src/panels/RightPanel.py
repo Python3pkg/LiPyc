@@ -91,6 +91,7 @@ class ActionPanel(Panel):
         
         self.albums = []
         self.albums_map = {}
+        self.map_albums = {}
         self.tree = ttk.Treeview(self)
         self.tree.grid(row=0, column=0)
         self.tree.grid(row=0, column=0)
@@ -103,11 +104,11 @@ class ActionPanel(Panel):
         
         self.b_bar = Frame(self)
         self.b_bar.grid(row=2, column=0)
-        self.b_addto = Button(self.b_bar, text="Add to", command = lambda _=None : self.app.add_to( objmap[int(tree.focus())] if tree.focus() else None ))
+        self.b_addto = Button(self.b_bar, text="Add to", command = lambda _=None : self.app.add_to( self.map_albums[self.tree.focus()] if self.tree.focus() else None ))
         self.b_addto.grid(row=2, column=0)
-        self.b_copyto = Button(self.b_bar, text="Copy to", command = lambda _=None : self.app.copy_to( objmap[int(tree.focus())] if tree.focus() else None ))
+        self.b_copyto = Button(self.b_bar, text="Copy to", command = lambda _=None : self.app.copy_to( self.map_albums[self.tree.focus()] if self.tree.focus() else None ))
         self.b_copyto.grid(row=2, column=1)
-        self.b_copyto = Button(self.b_bar, text="Move to", command = lambda _=None : self.app.move_to( objmap[int(tree.focus())] if tree.focus() else None ))
+        self.b_copyto = Button(self.b_bar, text="Move to", command = lambda _=None : self.app.move_to( self.map_albums[self.tree.focus()] if self.tree.focus() else None ))
         self.b_copyto.grid(row=2, column=2)
     
         self.current = 0
@@ -124,7 +125,7 @@ class ActionPanel(Panel):
             #keep track of order
             res.append( (tmp,parent) )
             
-            o.extend( [(album,tmp) for album in tmp.subalbums.keys() if album not in f] )
+            o.extend( [(album,tmp) for album in tmp.subalbums if album not in f] )
         
         return res
     
@@ -137,6 +138,7 @@ class ActionPanel(Panel):
                     self.tree.insert(self.albums_map[parent], 'end',  str(self.current) ,text=album.name)
                 
                 self.albums_map[ album ] = str(self.current)
+                self.map_albums[ str(self.current) ] =album
                 self.current += 1
             
     def set(self): #Must be called after each addition/removal/rename of an album
@@ -234,7 +236,12 @@ class RightPanel(Panel):
             "Files : %d" % f,
             "Rec files : %d" % n
         ])
-        self.infoPanel.set_buttons([], [])
+        
+        buttons_texts=["Remove"]
+        callbacks = [ 
+            lambda _=None : self.app.remove(objs)
+        ]
+        self.infoPanel.set_buttons(buttons_texts, callbacks)
     
     def set_pagination(self, objs):
         if self.objs == objs and [obj.version() for obj in objs] == self.versions:

@@ -87,14 +87,14 @@ class FileMetadata:
         return self.datetime == m2.datetime
 
 class File(Versionned):
-    def __init__(self, filename=None, location=None):
+    def __init__(self, filename=None, location=None, extracted = False):
         super().__init__()
         
         self.filename = filename
         self.location = location
         self.md5 = None
         self.metadata = FileMetadata(self)      
-        self.extracted = False  
+        self.extracted = extracted  
         
         if location and filename and not self.extracted:
             self.extract()
@@ -104,7 +104,7 @@ class File(Versionned):
         self.io_lock = threading.Lock() #pour gérer les export concurrant à une suppression si wait vérouiller on ne peut pas supprimer
 
     def __deepcopy__(self, memo):
-        new = File(self.filename, self.location)
+        new = File(self.filename, self.location, self.extracted)
         new.md5 = self.md5
         new.metadata = self.metadata.__deepcopy__(None, new)
         new.garbage_number = self.garbage_number #danger
@@ -157,7 +157,7 @@ class File(Versionned):
             flag = shutil.copy2( self.location, location) == location
          
     @io_protect() #la seule à devoir être proteger, du fait de la construction de l'application
-    def remove(self):
+    def remove(self):      
         if os.path.isfile(self.location):
             os.remove( self.location )
             
