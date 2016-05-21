@@ -2,13 +2,9 @@
 -> album/image tag 
 -> file sorting
 -> set cover
--> Suprr key
-->tree not updated when album suppressed
--> remove suppression si on demande suppression définitive on affiche la photo et le nom
--> quand annuler export,importload pas de message d'erreur
 -> loadbalancing entre (library, pool of library)
 -> replication entre (library, pool of library
-
+-> migration vers SQLite
 
 Doc : 
 add_to marche

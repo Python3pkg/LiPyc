@@ -23,7 +23,7 @@ from lipyc.File import File
 class Library:
     def __init__(self, location, load=True):
         if load and not os.path.isdir( location ):
-            messagebox.showerror("Error", "Library location : invalid")
+            raise Exception("Cannot load, invalid location")
         
         self.files = {} # ordered by hash
         self.albums = set() #orderder by id

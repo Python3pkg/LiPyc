@@ -130,7 +130,9 @@ class ActionPanel(Panel):
         return res
     
     def make_tree(self):
-        for album,parent in self.albums :
+        album_set = set()
+        for album,parent in self.albums : #insertion of new album
+            album_set.add(album)
             if album not in self.albums_map:
                 if parent == None:  
                     self.tree.insert("", 'end',  str(self.current) ,text=album.name)
@@ -140,7 +142,11 @@ class ActionPanel(Panel):
                 self.albums_map[ album ] = str(self.current)
                 self.map_albums[ str(self.current) ] =album
                 self.current += 1
-            
+        
+        for album,item in self.albums_map.items():#deletion of album
+            if album not in album_set:
+                self.tree.delete(item)
+    
     def set(self): #Must be called after each addition/removal/rename of an album
         albums = self.compute_albums()
         if albums != self.albums:

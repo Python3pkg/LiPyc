@@ -132,7 +132,9 @@ class Application(Tk):
         def _keyrelease_event(event): 
             if event.keycode == 37 or event.keycode == 105: #ctrl
                 self.selected_mod = False
-                
+            if event.keycode == 119:
+                self.remove( self.selected )
+
         def escape(e):
             if self.parents_album :
                 self.back()
@@ -281,7 +283,17 @@ class Application(Tk):
 #### Begin Menu
     def set_library_location(self, location=None):
         self.save_library()
-        self.library = Library( filedialog.askdirectory() if not location else location )
+        
+        if not location:
+            location = filedialog.askdirectory()
+        
+        if not location:
+            return False
+            
+        if not os.path.isdir( location ):
+            messagebox.showerror("Error", "Library location : invalid")
+        
+        self.library = Library( location )
         
         self.parents_album.clear()
         self.selected.clear()
@@ -297,7 +309,11 @@ class Application(Tk):
         if not self.library:
             messagebox.showerror("Error", "Library location : not defined")
             return False
-        if not location or not os.path.isdir( location ):
+            
+        if not location :
+            return False
+        
+        if not os.path.isdir( location ):
             messagebox.showerror("Error", "Source location : not defined")
             return False
         self.io_threads.append( self.library.add_directory( location ) )
@@ -322,7 +338,10 @@ class Application(Tk):
         
     def export_to(self):
         location = filedialog.askdirectory()
-        if not location or not os.path.isdir( location ):
+        if not location :
+            return False
+            
+        if not os.path.isdir( location ):
             messagebox.showerror("Error", "No target specified")
             return False
         
