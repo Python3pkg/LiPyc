@@ -1,0 +1,44 @@
+import base64
+from Crypto.Cipher import AES
+from Crypto import Random
+
+BS = 16
+pad = lambda s: s + (BS - len(s) % BS) * chr(BS - len(s) % BS) 
+unpad = lambda s : s[:-ord(s[len(s)-1:])]
+
+BUFF_SIZE = 1<<20 #multiple de 16
+
+class AESCipher:
+    def __init__( self, key ):
+        self.key = key
+
+    def encrypt( self, raw ):
+        raw = pad(raw)
+        iv = Random.new().read( AES.block_size )
+        cipher = AES.new( self.key, AES.MODE_CBC, iv )
+        return base64.b64encode( iv + cipher.encrypt( raw ) ) 
+
+    def decrypt( self, enc ):
+        enc = base64.b64decode(enc)
+        iv = enc[:16]
+        cipher = AES.new(self.key, AES.MODE_CBC, iv )
+        return unpad(cipher.decrypt( enc[16:] ))
+    
+    def encrypt_file(self, f_src, f_dst):
+        iv = Random.new().read( AES.block_size )
+        cipher = AES.new( self.key, AES.MODE_CBC, iv )
+        
+        raw = f_src.read( BUFF_SIZE + 16 )
+        while raw:
+            raw = iv + pad(raw)
+            f_dst.write( base64.b64encode((cipher.encrypt( raw ) )) )
+            raw = f.read(BUFF_SIZE)
+    
+    def decrypt_file(self, f_src, f_dst):
+        raw = base64.b64decode( f.read( BUFF_SIZE + 16 ) )
+        iv = enc[:16]
+        cipher = AES.new(self.key, AES.MODE_CBC, iv )
+
+        while raw:
+            f_dst.write( unpad(cipher.decrypt( raw ) ))
+            raw = base64.b64decode(f.read(BUFF_SIZE))

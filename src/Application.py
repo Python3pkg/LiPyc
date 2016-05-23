@@ -36,12 +36,13 @@ from lipyc.Library import Library
 from lipyc.Album import Album
 from lipyc.File import File
 from lipyc.config import *
-
+from lipyc.autologin import *
 
 #class Certificat(Enum):
     #add_album = 0
 
-class Application(Tk):
+
+class Application(Tk, WorkflowStep):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
                 
@@ -53,6 +54,7 @@ class Application(Tk):
         self.selected_mod = False
 
         self.current = 0 #page number   
+        self.sortname = "name"
         self.action = Action.pagination_albums
 
         self.io_threads=[]
@@ -142,18 +144,23 @@ class Application(Tk):
         self.bind("<KeyPress>", _keypress_event)
         self.bind("<KeyRelease>", _keyrelease_event)
         
+        #def _on_mousewheel(e):
+            #print(type(e.widget))
+        #self.bind("<MouseWheel>", _on_mousewheel)
+        #self.bind("<Button-4>", _on_mousewheel)
+        #self.bind("<Button-5>", _on_mousewheel)
+        
     def register_ticks(self):
         def _save():
             self.after(300000, _save)#ms, each 5 minutes
             self.save()
         
         def _refresh():
-            self.refresh()
-            self.after(3000, _refresh) #ms, each 5 minutes
+            self.refresh(auto=True)
+            self.after(1000, _refresh) 
         
         self.after(300000, _save)
-        self.after(3000, _refresh)
-        self.after(3000, _refresh)
+        self.after(1000, _refresh)
        
     def select(self, obj):
         if not self.selected_mod :
@@ -239,7 +246,7 @@ class Application(Tk):
         self.action = Action.pagination
         self.refresh()
           
-    def add_album(self, name, frame):
+    def add_album(self, name):
         if not name :
             messagebox.showerror("Error", "Invalid name for album name")
 
@@ -248,11 +255,6 @@ class Application(Tk):
             self.parents_album[-1].add_subalbum( album )
         else:
             self.library.add_album( album )
-               
-        #clean_frame(frame)
-        #b_add_album = Button(frame, text="Add album", command= lambda _=None : self.make_add_album(f_add_album) )
-        #b_add_album.pack(side=LEFT)
-        #frame.pack(side=LEFT)
                
         self.action = Action.pagination_albums
         self.rightPanel.actionPanel.set()
@@ -398,14 +400,27 @@ class Application(Tk):
 #### End BottomPanel
 ## End Event Handling
     
-    def rename_album(self, name):
+    def rename_album(self, obj, name):
         if not name :
             messagebox.showerror("Error", "Invalid name for album name")
             
-        (list(self.selected_albums)[0].album).rename( name )
+        obj.rename( name )
         
         self.rightPanel.actionPanel.set()
         self.refresh()
+        
+    def set_cover(self, obj):
+        location = filedialog.askopenfilename()
+        if not location :
+            return None
+        
+        if not os.path.isfile( location ):
+            messagebox.showerror("Error", "Invalid cover location")
+        
+        obj.set_cover(location, self.library.location)
+        
+    def set_sortname(self, name):
+        self.sortname = name
         
     def _refresh(self):
         if not self.library:
@@ -423,10 +438,12 @@ class Application(Tk):
         elif self.action == Action.display_file:
             pass
         
-    def refresh(self):
+    def refresh(self, auto=False):
         s = default_timer()
+        if not auto :
+            self.mainPanel.reset()
         self._refresh()
-        #print("Refresh duration %f",  default_timer()-s)
+        print("Refresh duration %f",  default_timer()-s)
    
     def remove_file(self, _file, refresh=False):#surtout pas de thread io
         self.parents_album[-1].remove_file( _file, self.library.files )

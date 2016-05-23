@@ -28,6 +28,22 @@ from lipyc.File import File
 from lipyc.config import *
 
 
+sort_functions={
+    "name":{
+        Album: (lambda album : album.name),
+        File : (lambda _file : _file.filename)
+    },"date":{
+        Album: (lambda album : album.datetime),
+        File: (lambda _file : _file.metadata.datetime)
+    },"size":{
+        Album: (lambda album : len(album) ),
+        File: (lambda _file : _file.metadata.size)
+    }
+}
+
+sort_functions_names = sorted( sort_functions )
+
+
 
 class TopPanel(Panel):
     def __init__(self, app, master, max_buttons, *args, **kwargs):
@@ -39,10 +55,19 @@ class TopPanel(Panel):
         self.buttons_text = ["" for k in range(max_buttons)]
         self.buttons_callback = [None for k in range(max_buttons)]
             
+        self.last_action = ""
+        self.last_parents = 0
+            
         for k in range(max_buttons):
-            tmp = Button(self)
+            tmp = Frame(self)
+            tmp.button = Button(tmp)
+            tmp.widget = None
+            tmp.button.pack(side=RIGHT)
+            
             tmp.grid(row=k, column=max_buttons)
             tmp.grid_forget()
+            
+
             
             self.buttons.append(tmp)
 
@@ -51,7 +76,7 @@ class TopPanel(Panel):
             return None
         
         for k in range(0, min(len(texts), len(self.buttons))):
-            self.buttons[k].configure( text=texts[k], command=callbacks[k] )
+            self.buttons[k].button.configure( text=texts[k], command=callbacks[k] )
             self.grid()
             
             self.buttons[k].grid(row=0, column=k)
@@ -63,24 +88,74 @@ class TopPanel(Panel):
             self.buttons_text[k] = ""
             self.buttons_callback[k] = None
        
-    def set_pagination(self):        
+    def set_widget_for(self, k, make, text, callback): #befor button k, callback for button k
+        print(len(self.buttons_callback), k)
+        if not self.buttons_callback[k]:
+            return False
+
+        def reset_():
+            if callback:
+                callback()
+        
+            self.buttons[k].widget.destroy()
+            self.last_action = "" #redraw foced
+            self.app.refresh()
+            
+        self.buttons[k].widget = make( self.buttons[k] )
+        self.buttons[k].widget.pack()
+        self.buttons[k].button.configure( text=text, command=reset_ )
+        
+        self.buttons_text[k] = text
+        self.buttons_callback[k] = callback
+       
+    def set_pagination(self):    
+        if self.last_action == "pagination" and self.last_parents == len(self.app.parents_album):
+            return None
+
+        self.last_action = "pagination"
+        self.last_parents = len(self.app.parents_album)
+        
         texts=["Back"] if self.app.parents_album else []
         texts.extend([
             "Add album",
             "Show files",
-            "Show albums"
+            "Show albums",
+            "Sort by",
         ])
         
         callbacks=[self.app.back] if self.app.parents_album else []
+
+        def sort_(master):
+            frame = Frame(master)
+            self.listBox =  Listbox(frame, selectmode=BROWSE, height=2)
+            scrollBar = Scrollbar(frame, command = self.listBox.yview)
+            self.listBox.config(yscrollcommand = scrollBar.set) 
+           
+            for name in sort_functions_names:
+                self.listBox.insert("end", name)
+                
+            self.listBox.pack(side = LEFT, fill = Y) 
+            scrollBar.pack(side = RIGHT, fill = Y)    
+            return frame
+            
+        
+        offset = len(callbacks)
+        name = StringVar() 
+        name.set("New_name")
         callbacks.extend([
-            lambda _=None : self.app.make_add_album(self),
+            lambda _=None : self.set_widget_for(offset, lambda master:Entry(master, textvariable=name, width=15), "Add", lambda _=None:self.app.add_album(name.get())),
             self.app.show_files,
-            self.app.show_albums
+            self.app.show_albums,
+            lambda _=None : self.set_widget_for(offset+3, lambda master:sort_(master), "Sort", lambda _=None:self.app.set_sortname(self.listBox.get(self.listBox.curselection()))),
         ])
         
         self.set_buttons( texts, callbacks)
 
-    def set_display(self):        
+    def set_display(self):     
+        if self.last_action == "display":
+            return None
+        self.last_action = "display"   
+        
         texts=["Back"]
         callbacks=[self.app.back]
         
@@ -128,7 +203,6 @@ class PaginationBottomPanel(Panel):
             self.grid()
             
             self.buttons_text[k] = texts[k]
-            print( self.buttons_callback[k] )
             self.buttons_callback[k] = callbacks[k]
         
         for k in range(len(texts), len(self.buttons)):
@@ -234,9 +308,13 @@ class Tile(Panel):
         
         self.obj = obj
         self.version = obj.version()
+
+        print( self.data.width(), self.data.height())
+        offset_width = (THUMBNAIL_WIDTH - self.data.width()) / 2
+        offset_height = (THUMBNAIL_HEIGHT- self.data.height()) / 2
             
         self.thumbnail.delete("all")
-        self.thumbnail.create_image(0, 0, anchor=NW, image=self.data) 
+        self.thumbnail.create_image(offset_width, offset_height, anchor=NW, image=self.data) 
         self.thumbnail.bind('<Double-Button-1>', callback1 ) 
         self.thumbnail.bind('<Triple-Button-1>', callback1 ) 
         self.thumbnail.bind('<Button-3>', callback1 ) 
@@ -247,11 +325,14 @@ class Tile(Panel):
 class PaginationPanel(VScrolledPanel):
     def __init__(self, app, master, num_x, num_y, *args, **kwargs):
         super().__init__(master, bg="white", *args, **kwargs)
+        self.canvas.configure(height=480)
         
+        self.app = app
         self.num_x = num_x
         self.num_y = num_y
         
         self.last_len = 0
+        self.sortname = "name"
         
         self.tiles=[ Tile(app, self.interior) for j in range(num_x*num_y) ]
         for j in range(num_y):
@@ -260,32 +341,19 @@ class PaginationPanel(VScrolledPanel):
                 self.tiles[i * num_y + j].i=i
                 self.tiles[i * num_y + j].j=j
          
-        self.sort_functions={
-            "name":{
-                Album: (lambda album : album.name),
-                File : (lambda _file : _file.filename)
-            },"date":{
-                Album: (lambda album : album.datetime),
-                File: (lambda _file : _file.metadata.datetime)
-            },"size":{
-                Album: (lambda album : len(album) ),
-                File: (lambda _file : _file.metadata.size)
-            }
-        }
-         
     def refresh(self):
         for i in range(self.last_len):
             self.tiles[i].refresh()
                 
-    def set(self, objs, sortname="name"):        
+    def set_sortname(self, name):
+        self.sortname = name
+            
+    def set(self, objs):        
         if objs:
             tmp = objs.pop()
             objs.add( tmp )
-            objs = sorted( objs, key=self.sort_functions[sortname][type(tmp)])
-            #objs.sort( key=self.sort_functions[sortname][type(objs[0])] )
-        self.reset()
+            objs = sorted( objs, key=sort_functions[self.app.sortname][type(tmp)])
 
-        print("objs len %d"% len(objs))
         for i in range(0, min(len(objs), len(self.tiles))):
             self.tiles[i].set( objs[i] )
             self.tiles[i].show()
@@ -310,7 +378,10 @@ class DisplayPanel(Panel):
         self.thumbnail.pack()
      
     def refresh(self):
-        None
+        pass
+        
+    def reset(self):
+        pass
         
     def set(self, obj):
         if self.obj == obj and self.version == obj.version() :
@@ -324,15 +395,19 @@ class DisplayPanel(Panel):
         width, height = im.size
         ratio = float(width)/float(height)
         if float(width)/float(DISPLAY_WIDTH) < float(height)/float(DISPLAY_HEIGHT):
-            height = min(height,DISPLAY_HEIGHT)
+            height = min(height, DISPLAY_HEIGHT)
             width = int(ratio * height)
         else:
-            width = min(width,DISPLAY_HEIGHT)
+            width = min(width, DISPLAY_WIDTH)
             height = int(width / ratio)
-
+            
+            
+        offset_width = (DISPLAY_WIDTH - width) / 2
+        offset_height = (DISPLAY_HEIGHT- height) / 2
+            
         self.data = ImageTk.PhotoImage(im.resize((width, height), Image.ANTIALIAS))
         self.thumbnail.delete("all")
-        self.thumbnail.create_image(0, 0, anchor=NW, image=self.data) 
+        self.thumbnail.create_image(offset_width, offset_height, anchor=NW, image=self.data) 
             
 class MainPanel(Panel):
     def __init__(self, app, master, num_x=6, num_y=6, max_buttons=5, *args, **kwargs):
@@ -345,7 +420,7 @@ class MainPanel(Panel):
         self.bottomPanel.grid(row=0, column=2)
         
         self.centers = {
-            "pagination" : PaginationPanel(app, self, num_x, num_y),
+            "pagination" : PaginationPanel(app, self, num_x, num_y, height=500),
             "display" : DisplayPanel(app, self)
         }
         
@@ -388,3 +463,6 @@ class MainPanel(Panel):
         self.centerPanel.refresh()
         self.topPanel.refresh()
         self.bottomPanel.refresh()
+
+    def reset(self):
+        self.centerPanel.reset()

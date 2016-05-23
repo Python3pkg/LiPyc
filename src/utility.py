@@ -1,3 +1,7 @@
+from PIL import Image
+
+from lipyc.config import *
+
 def io_protect(default=None):
     def decorator(function):
         def new_function(self, *args, **kwargs):
@@ -23,10 +27,21 @@ def recursion_protect(default=None, f= (lambda x:x)):
         return protect_function
     return decorator
 
-exts   = [ "png", "jpeg", "jpg", "mov", "mp4", "mpg", "thm", "3gp"]
-img_exts = [ "png", "jpeg", "jpg"]
-mv_exts = ["mov", "mp4", "mpg", "thm", "3gp"]
-
 def check_ext(filename, exts_=exts):
     currentExt  = filename.split( '.' )[ -1 ]
     return currentExt.lower() in exts_
+
+def make_thumbnail(src, dst):
+    im = Image.open( src )
+    
+    width, height = im.size
+    ratio = float(width)/float(height)
+    if float(width)/float(THUMBNAIL_WIDTH) < float(height)/float(THUMBNAIL_HEIGHT):
+        height = min(height, THUMBNAIL_HEIGHT)
+        width = int(ratio * height)
+    else:
+        width = min(width, THUMBNAIL_WIDTH)
+        height = int(width / ratio)
+            
+    im.thumbnail( (width, height) )
+    im.save(dst, "JPEG")

@@ -2,16 +2,27 @@ from distutils.core import setup
 import os
 
 setup(name="LiPyc",
-        version="0.1.0",
+        version="0.3.0.dev1",
         description="",
         author="Laurent Prosperi",
         author_email="laurent.prosperi@ens-cachan.fr",
-        url="",
+        url="https://github.com/severus21/LiPyc",
         platforms="",
-        license="",
-        package_dir = {"lipyc": "src"},
+        license="Apache 2.0",
+        classifiers=[
+            'Development Status :: 2 - Pre-Alpha',  #https://pypi.python.org/pypi?%3Aaction=list_classifiers
+
+            'Intended Audience :: End Users/Desktop',
+            'Topic :: Multimedia :: Graphics :: Viewers',
+
+            'License :: OSI Approved :: Apache Software License',
+
+            'Programming Language :: Python :: 3.4',
+        ],
         packages=["lipyc", "lipyc.panels"],
-        requires=["PIL", "tkinter"],
+        keywords= ["picture", "managment"],
+        package_dir = {"lipyc": "src"},
+        requires=["PIL", "tkinter", "pycrypto"],
         data_files=[
             ("", ["album_default.png", "file_default.png"]),
         ]

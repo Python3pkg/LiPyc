@@ -8,6 +8,8 @@ from lipyc.File import File, FileMetadata
 import sys
 import logging
 
+sys.setrecursionlimit(500)
+
 #logging.basicConfig(
         #stream= sys.stdout,
         #format='%(asctime)s  %(levelname)s  %(filename)s %(funcName)s %(lineno)d %(message)s',
@@ -15,7 +17,7 @@ import logging
 logging.basicConfig(
         stream= sys.stdout,
         format='%(message)s',
-        level=logging.DEBUG)
+        level=logging.INFO)
 
 app = Application()
 app.mainloop()

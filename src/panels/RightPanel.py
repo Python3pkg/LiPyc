@@ -43,7 +43,11 @@ class InfoPanel(Panel):
             self.labels.append(tmp)
             
         for k in range(max_buttons):
-            tmp = Button(self)
+            tmp = Frame(self)
+            tmp.button = Button(tmp)
+            tmp.widget = None
+            tmp.button.pack(side=RIGHT)
+            
             tmp.grid(row=max_labels, column=k)
             tmp.grid_forget()
             
@@ -71,7 +75,10 @@ class InfoPanel(Panel):
             return None
         
         for k in range(0, min(len(texts), len(self.buttons))):
-            self.buttons[k].configure( text=texts[k], command=callbacks[k] )
+            if self.buttons[k].widget:
+                self.buttons[k].widget.destroy()
+                self.buttons[k].widget = None
+            self.buttons[k].button.configure( text=texts[k], command=callbacks[k] )
             self.buttons[k].grid()
             
             self.buttons[k].grid(row=len(self.labels), column=k)
@@ -80,18 +87,30 @@ class InfoPanel(Panel):
         
         for k in range(len(texts), len(self.buttons)):
             self.buttons[k].grid_forget()
-            self.labels_text[k] = ""
-            self.callbacks = None
+            self.buttons_text[k] = ""
+            self.buttons_callback[k] = None
+        
+    def set_widget_for(self, k, make, text, callback): #befor button k, callback for button k
+        if not self.buttons_callback[k]:
+            return False
             
+        def reset_():
+            self.buttons[k].widget.destroy()
+            if callback:
+                callback()
+            
+        self.buttons[k].widget = make( self.buttons[k] )
+        self.buttons[k].widget.pack()
+        self.buttons[k].button.configure( text=text, command=reset_ )
+        self.buttons_text[k] = text
+        self.buttons_callback[k] = callback
+
 class ActionPanel(Panel):
     def __init__(self, app, master, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
         
         self.app = app
         
-        self.albums = []
-        self.albums_map = {}
-        self.map_albums = {}
         self.tree = ttk.Treeview(self)
         self.tree.grid(row=0, column=0)
         self.tree.grid(row=0, column=0)
@@ -111,47 +130,38 @@ class ActionPanel(Panel):
         self.b_copyto = Button(self.b_bar, text="Move to", command = lambda _=None : self.app.move_to( self.map_albums[self.tree.focus()] if self.tree.focus() else None ))
         self.b_copyto.grid(row=2, column=2)
     
+        self.albums_map = {}
+        self.map_albums = {}
         self.current = 0
    
-    def compute_albums(self):
-        o = [(album,None) for album in self.app.library.albums]
+    def make_tree(self):
+        o = sorted(self.app.library.albums, key=lambda elt:elt.name)
+        for elt in o:
+            self.tree.insert( "", 'end',  str(self.current) ,text=elt.name)
+                
+            self.albums_map[ elt ] = str(self.current)
+            self.map_albums[ str(self.current) ] = elt
+            self.current += 1
+        
         f = set()
-        res = [] 
         
         while o :
-            tmp,parent = o.pop()
-            #O(1) acces
-            f.add( (tmp, parent) )
-            #keep track of order
-            res.append( (tmp,parent) )
+            tmp = o.pop()
+            f.add(tmp)
             
-            o.extend( [(album,tmp) for album in tmp.subalbums if album not in f] )
-        
-        return res
-    
-    def make_tree(self):
-        album_set = set()
-        for album,parent in self.albums : #insertion of new album
-            album_set.add(album)
-            if album not in self.albums_map:
-                if parent == None:  
-                    self.tree.insert("", 'end',  str(self.current) ,text=album.name)
-                else:
-                    self.tree.insert(self.albums_map[parent], 'end',  str(self.current) ,text=album.name)
+            subalbums = sorted(tmp.subalbums, key=lambda elt:elt.name)
+            o.extend( [album for album in subalbums if album not in f] )
+
+            for elt in subalbums:
+                self.tree.insert( self.albums_map[ tmp ], 'end',  str(self.current) ,text=elt.name)
                 
-                self.albums_map[ album ] = str(self.current)
-                self.map_albums[ str(self.current) ] =album
+                self.albums_map[ elt ] = str(self.current)
+                self.map_albums[ str(self.current) ] = elt
                 self.current += 1
-        
-        for album,item in self.albums_map.items():#deletion of album
-            if album not in album_set:
-                self.tree.delete(item)
     
     def set(self): #Must be called after each addition/removal/rename of an album
-        albums = self.compute_albums()
-        if albums != self.albums:
-            self.albums = albums
-            self.make_tree()
+        self.tree.delete(*self.tree.get_children())
+        self.make_tree()
             
         self.grid()
 
@@ -174,7 +184,6 @@ class RightPanel(Panel):
         self.versions = None
     
     def set_display(self, obj):
-        print( "Right panel, displaing ")
         self.actionPanel.hide()
         if self.objs == [obj] and [obj.version()] == self.versions:
             return None
@@ -198,6 +207,7 @@ class RightPanel(Panel):
         self.versions = [obj.version()]
     
     def set_pagination_unaire(self, obj):
+        print("redrax")
         if isinstance(obj, File) :
             labels_texts= [
                 obj.filename,
@@ -216,9 +226,13 @@ class RightPanel(Panel):
                 "Files : %d" % len(obj.files),
                 "Datetime : %s" % time.strftime( "%Y-%d-%m", obj.datetime)
             ]
-            buttons_texts=["Rename", "Remove"]
+            buttons_texts=["Set cover", "Rename", "Remove"]
+
+            name = StringVar() 
+            name.set(obj.name)
             callbacks = [ 
-                lambda _=None :self.set_rename_album(handler, f_rename),
+                lambda _=None : self.app.set_cover(obj),
+                lambda _=None : self.infoPanel.set_widget_for(1, lambda master:Entry(master, textvariable=name, width=15), "Rename", lambda _=None:self.app.rename_album(obj, name.get())),
                 lambda _=None : self.app.remove_album(obj, True)
             ]
         
@@ -250,6 +264,7 @@ class RightPanel(Panel):
         self.infoPanel.set_buttons(buttons_texts, callbacks)
     
     def set_pagination(self, objs):
+        print(self.objs == objs)
         if self.objs == objs and [obj.version() for obj in objs] == self.versions:
             return None
         
@@ -265,5 +280,5 @@ class RightPanel(Panel):
             self.infoPanel.hide()
             self.actionPanel.hide()
             
-        self.objs = objs
+        self.objs = copy.copy( objs )
         self.versions = [obj.version() for obj in objs]

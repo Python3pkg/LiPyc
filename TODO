@@ -1,11 +1,12 @@
 -> search
 -> album/image tag 
--> file sorting
--> set cover
+-> il faudrait un truc pour sauvegarder totue les actions et pouvoir les rejouer pour détecter les bugs d'autres tuilisateurs
 -> loadbalancing entre (library, pool of library)
 -> replication entre (library, pool of library
 -> migration vers SQLite
-
+-> en display mod un suivant prcedent pour faire défile les photos avec un link a fleche gauche droite, de même pour ce deplace dans pagination
+-> cache d'image
+-> set cover depuis une picture
 Doc : 
 add_to marche
 move_to marche

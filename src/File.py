@@ -15,13 +15,15 @@ import threading
 from math import ceil
 from enum import Enum
 
-from lipyc.utility import io_protect, check_ext, img_exts
+from lipyc.utility import io_protect, check_ext, make_thumbnail
 from lipyc.Version import Versionned
 from lipyc.config import *
 
 from ctypes import c_int
+from lipyc.autologin import *
 
-class FileMetadata:
+
+class FileMetadata(WorkflowStep):
     def __init__(self, parent = None):
         self.parent = parent
        
@@ -64,14 +66,7 @@ class FileMetadata:
                         self.datetime  = time.strptime( value, "%Y:%m:%d %H:%M:%S")
             else:
                 logging.debug("info empty for %s   %s" % (self.parent.location, self.parent.filename))
-                
-            if not self.datetime:
-                tmp = ""
-                for tag, value in info.items():
-                    decoded = TAGS.get(tag, tag)
-                    tmp += decoded + "\n"
-                logging.debug("tag not found in %s" % tmp)
-            
+    
         if not self.datetime :
             nbs = os.path.getmtime(self.parent.location)
             self.datetime  = time.gmtime(nbs)
@@ -131,9 +126,7 @@ class File(Versionned):
     
     def create_thumbnails(self):
         if check_ext(self.filename, img_exts):
-            im = Image.open( self.location )
-            im.thumbnail( (THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH) )
-            im.save(self.metadata.thumbnail, "JPEG")
+            make_thumbnail( self.location, self.metadata.thumbnail)
         else:
             shutil.copy2("file_default.png", self.metadata.thumbnail)
        

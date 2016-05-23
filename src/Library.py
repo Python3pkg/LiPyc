@@ -18,9 +18,9 @@ from enum import Enum
 from lipyc.utility import io_protect, check_ext
 from lipyc.Album import Album
 from lipyc.File import File
+from lipyc.autologin import *
 
-
-class Library:
+class Library(WorkflowStep):
     def __init__(self, location, load=True):
         if load and not os.path.isdir( location ):
             raise Exception("Cannot load, invalid location")
@@ -36,7 +36,7 @@ class Library:
             self.load()
     
     def __str__(self):
-        return "Library\nFiles : %d\nAlbums : %d\ninner_albums : %d\n" % (len(self.files), len(self.albums), len(self.inner_albums))
+        return ""
         
     def __deepcopy__(self, memo):
         new = Library(self.location, False)

@@ -1,3 +1,5 @@
+from PIL import Image
+
 import os.path
 import pickle
 import hashlib
@@ -13,6 +15,8 @@ from enum import Enum
 
 from lipyc.utility import recursion_protect
 from lipyc.Version import Versionned
+from lipyc.config import *
+from lipyc.utility import check_ext, make_thumbnail
 
 from tkinter import messagebox
 
@@ -35,8 +39,7 @@ class Album(Versionned): #subalbums not fully implemented
         if self.cover == None and  _file.metadata.thumbnail :
             if not os.path.isdir( os.path.join( path, ".cover")):
                 os.makedirs( os.path.join( path, ".cover") )
-            self.cover = os.path.join( path, ".cover" , str(id(self)) + ".thumbnail")
-            shutil.copy2(_file.metadata.thumbnail, self.cover)
+            self.set_cover( _file.metadata.thumbnail, path )
             
         _file.garbage_number.value += 1
         self.files.add(_file)
@@ -109,6 +112,18 @@ class Album(Versionned): #subalbums not fully implemented
             
         for album in self.subalbums:
             album.lock_files()   
+    
+    def set_cover(self, location, path):
+        if self.cover :
+            os.remove(self.cover)
+        
+        self.cover = os.path.join( path, ".cover" , str(id(self)) + ".thumbnail")
+
+        
+        if check_ext(location, img_exts):
+            make_thumbnail( location, self.cover)
+        else:
+            shutil.copy("album_default.png", self.cover)
     
     @recursion_protect(0)
     def __len__(self): #number of file in dir and subdir
