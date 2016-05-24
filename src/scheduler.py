@@ -3,12 +3,16 @@ import json
 from copy import copy
 from lipyc.crypto import AESCipher
 import itertools
+import os
 
 def wrand(seed, value):
     #speed, the placement groupe, pool id etc
     a, b = 6364136223846793005, 1
     
     return a * ((a * seed + b) ^ value ) + b; 
+
+def make_path(path, afile):
+    return os.path.join( "path", "%s_%s" % (afile.md5[:16],afile.filename)) 
 
 def counter(cls):
     id_name = "_%s__id" % cls.__name__
@@ -77,7 +81,7 @@ class Container:
             self._min_obj = obj
             return
             
-        if self._min_obj.free_capacity <= obj.capacity:
+        if self._min_obj.free_capacity <= obj.free_capacity:
             return
         
         r = int(obj.free_capacity / self._min_obj.free_capacity)
@@ -124,6 +128,16 @@ class Bucket(Container): #décrit un dossier ex: photo, gdrive, dropbox
     def access(self, afile):
         return self.files[afile]
         
+    def write(self, afile, location):
+        if bucket.crypt :
+            cipher = AESCipher(self.aeskey)
+            encrypt_file( open(location, "rb"), open(make_path(self.path, afile), "wb"))
+        else:
+            shutil.copy2(location, make_path(self.path, afile))
+    
+    def remove(self, afile):
+        os.remove( make_path(self.path, afile) )
+    
 @counter
 class Pool(Container):  #on décrit un disque par exemple avec pool
     def make(name, json_pool, aeskey):#config json to pool
@@ -179,7 +193,7 @@ class PG(Container):
         child = min( self.children, 
             key = lambda obj:wrand( obj.__id, key))
         
-       return child.access( key )
+        return child.access( key )
         
         
     def buckets(self):
@@ -212,12 +226,12 @@ class Scheduler(Container):
             bucket = max( buckets, key=lambda bucket:bucket.speed)
         return bucket
         
-    def add_file(self, afile):
+    def add_file(self, afile, location): #current location of the file
         self.passive = False
         key = int(afile.md5, 16)
         
         for bucket in self.place(key):
-            #qqch come save le fichier
+            bucket.write( afile )
         
         self.files.add(afile)
         
@@ -226,27 +240,36 @@ class Scheduler(Container):
         key = int(afile.md5, 16)
         
         for bucket in self.place(key):
-            #qqch come remove le fichier
+            bucket.remove(afile)
             
         self.files.discard(afile)
 
-    def get_file(self, afile, mod):
-        key = int(afile.md5, 16)
-        
+    def get_file(self, afile):
+        key = int(afile.md5, 16)        
         bucket = self.access(key)
-        ##qqch comme compute le chemin d'acces : en gros path/md5_filename
         
-        return open( , mod)
+        return open( make_path(bucket.path, afile), "r")
     
     def add_pg(self, pg):
         if self.passive:
             return super().add(pg)
          
+        files_to_move = {}
+        for afile in self.files:
+            key = int(afile.md5, 16)
+            pgs = self.place_(key)
+            pgs.append( pg )
+            pg_max = max(pgs, key=lambda obj:wrand( obj.__id, key))
+            if pg != pg_max:
+                bucket = max_pg.place(key)
+                
+                pg.place(key).write( afile, make_path(bucket.path, afile) )
+                bucket.remove( afile )
         
     def remove_pg(self, pg):
         if self.passive:
-            super().remove(pg)
-        
+            return super().remove(pg)
+
         files_to_move = {}
         for afile in self.files:
             key = int(afile.md5, 16)
@@ -254,13 +277,15 @@ class Scheduler(Container):
             if pg in pgs:
                 pgs.remove(pg)
                 files_to_move.add( (key, afile, pgs) )
-            #remove location
+        
+        self.pgs.discard(pg)
         
         for key,afile,pgs in files_to_move:
-            for pg in filter(lambda pg: pg not in pgs self.place_(key)):
-                bucket = pg.place(key)
-                #do somtehing like write the file, do it befor deletetion
-            
+            bucket = pg.place( key )
+            for n_pg in filter(lambda n_pg: n_pg not in pgs, self.place_(key)):#en pratique un seul
+                n_pg.place(key).write( afile, make_path(bucket.path, afile) )
+            bucket.remove( afile )
+        
     def load(self, location):
         with open(location, "r") as f:
             config = json.load(open("pgs.json"))
@@ -275,6 +300,7 @@ class Scheduler(Container):
     
     def buckets(self):
         return itertools.chain( map( Pool.children, self.pgs ))
+
 s = Scheduler()  
 s.load("pgs.json")          
 pg = PG()
@@ -286,5 +312,4 @@ p.add( b1 )
 p.add( b2 )
 
 pg.add(p)
-
 s.add(pg)            
