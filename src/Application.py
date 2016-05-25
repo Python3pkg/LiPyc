@@ -15,7 +15,6 @@ import os.path
 import pickle
 import hashlib
 import time
-import shutil
 import random
 import logging
 import copy
@@ -37,6 +36,7 @@ from lipyc.Album import Album
 from lipyc.File import File
 from lipyc.config import *
 from lipyc.autologin import *
+from lipyc.scheduler import scheduler
 
 #class Certificat(Enum):
     #add_album = 0
@@ -113,6 +113,8 @@ class Application(Tk, WorkflowStep):
         for th in self.io_threads:
             if th.is_alive():
                 th.join()
+        
+        scheduler.store()
         self.destroy()
 #### Async IO
     def save(self):
@@ -205,38 +207,6 @@ class Application(Tk, WorkflowStep):
         self.leftPanel.show()
         self.rightPanel.show()
 #### End Views               
-
- 
-    #def make_add_album(self, frame):
-        #clean_frame( frame )
-        #frame.pack(side=LEFT)
-        
-        #name = StringVar() 
-        #name.set("Album name")
-        #name_entry = Entry(frame, textvariable=name, width=10)
-        #name_entry.pack(side=LEFT)
-        
-        #button = Button(frame, text="Add")
-        #button.bind("<Button-1>", lambda event: self.add_album(name.get(), frame))
-        #button.pack(side=LEFT)
-        
-        #frame.pack()
-        
-    #def make_rename_album(self, handler, frame):
-        #clean_frame( frame )
-        #frame.pack(side=TOP)
-        
-        #name = StringVar() 
-        #name.set(handler.album.name)
-        #name_entry = Entry(frame, textvariable=name, width=15)
-        #name_entry.pack(side=LEFT)
-        
-        #button = Button(frame, text="Rename")
-        #button.bind("<Button-1>", lambda event: self.rename_album(name.get()))
-        #button.pack(side=LEFT)
-  
-#### End Make
-    
      
 ## Begin Event Handling
 #### Begin TopPanel
@@ -446,7 +416,7 @@ class Application(Tk, WorkflowStep):
         print("Refresh duration %f",  default_timer()-s)
    
     def remove_file(self, _file, refresh=False):#surtout pas de thread io
-        self.parents_album[-1].remove_file( _file, self.library.files )
+        self.parents_album[-1].remove_file( _file )
         
         self.selected.discard(_file)
     

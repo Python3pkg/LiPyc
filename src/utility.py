@@ -1,7 +1,11 @@
 from PIL import Image
 
-from lipyc.config import *
+import tempfile
+import hashlib
 
+from lipyc.config import *
+from lipyc.scheduler import scheduler
+#ImageFile.LOAD_TRUNCATED_IMAGES = True
 def io_protect(default=None):
     def decorator(function):
         def new_function(self, *args, **kwargs):
@@ -31,7 +35,7 @@ def check_ext(filename, exts_=exts):
     currentExt  = filename.split( '.' )[ -1 ]
     return currentExt.lower() in exts_
 
-def make_thumbnail(src, dst):
+def make_thumbnail(src):
     im = Image.open( src )
     
     width, height = im.size
@@ -44,4 +48,10 @@ def make_thumbnail(src, dst):
         height = int(width / ratio)
             
     im.thumbnail( (width, height) )
-    im.save(dst, "JPEG")
+    
+    with tempfile.SpooledTemporaryFile(max_size=1<<21) as f_tmp:
+        im.save(f_tmp, "JPEG")
+        f_tmp.seek(0)
+        return scheduler.add_file( f_tmp )
+        
+    return None

@@ -8,7 +8,10 @@ src/File.py
 src/Library.py
 src/Version.py
 src/__init__.py
+src/autologin.py
 src/config.py
+src/crypto.py
+src/scheduler.py
 src/utility.py
 src/panels/LeftPanel.py
 src/panels/MainPanel.py

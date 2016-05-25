@@ -26,6 +26,7 @@ from lipyc.panels.Panel import Panel, VScrolledPanel
 from lipyc.Album import Album
 from lipyc.File import File
 from lipyc.config import *
+from lipyc.scheduler import scheduler
 
 
 sort_functions={
@@ -89,7 +90,6 @@ class TopPanel(Panel):
             self.buttons_callback[k] = None
        
     def set_widget_for(self, k, make, text, callback): #befor button k, callback for button k
-        print(len(self.buttons_callback), k)
         if not self.buttons_callback[k]:
             return False
 
@@ -232,9 +232,6 @@ class PaginationBottomPanel(Panel):
 
     def refresh(self):
         self.set_pagination( self.number )
-        
-DEFAULT_ALBUM_DATA = Image.open("album_default.png")
-DEFAULT_FILE_DATA = Image.open("file_default.png")
 
 class Tile(Panel):
     def __init__(self, app, master, *args, **kwargs):
@@ -266,11 +263,6 @@ class Tile(Panel):
         self.thumbnail.pack_forget()
     
     def set_album(self, album):  
-        if album.cover :
-            self.data = ImageTk.PhotoImage(Image.open( album.cover ))
-        else:
-            self.data = ImageTk.PhotoImage(DEFAULT_ALBUM_DATA)
-            
         def _display(event):
             self.app.parents_album.append(album)
             self.app.action = Action.pagination
@@ -282,12 +274,7 @@ class Tile(Panel):
             
     def set_file(self, _file):  
         self.title.pack_forget()
-        
-        if _file.metadata.thumbnail :
-            self.data = ImageTk.PhotoImage(Image.open( _file.metadata.thumbnail ))
-        else:
-            self.data = ImageTk.PhotoImage(DEFAULT_FILE_DATA)
-      
+    
         return lambda event: self.app.display_file( _file ), lambda event: self.app.select( _file )
         
     def refresh(self):
@@ -301,6 +288,8 @@ class Tile(Panel):
         if self.obj == obj and self.version == obj.version() :
             return None
         
+        self.data = ImageTk.PhotoImage( Image.open(scheduler.get_file( obj.thumbnail ) ))
+        
         if isinstance(obj, Album):
             callback1, callback2 = self.set_album(obj)
         else:
@@ -309,7 +298,6 @@ class Tile(Panel):
         self.obj = obj
         self.version = obj.version()
 
-        print( self.data.width(), self.data.height())
         offset_width = (THUMBNAIL_WIDTH - self.data.width()) / 2
         offset_height = (THUMBNAIL_HEIGHT- self.data.height()) / 2
             
@@ -390,7 +378,7 @@ class DisplayPanel(Panel):
         self.obj = obj
         self.version = obj.version()
             
-        im=Image.open( obj.location )
+        im=Image.open( scheduler.get_file( obj.md5) )
         
         width, height = im.size
         ratio = float(width)/float(height)

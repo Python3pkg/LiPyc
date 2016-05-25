@@ -21,14 +21,14 @@ from lipyc.config import *
 
 from ctypes import c_int
 from lipyc.autologin import *
+from lipyc.scheduler import scheduler
 
 
-class FileMetadata(WorkflowStep):
+class FileMetadata:
     def __init__(self, parent = None):
         self.parent = parent
        
         self.datetime  = None
-        self.thumbnail  = None
         self.year = None
         self.month = None
         self.width, self.height = 0, 0
@@ -37,25 +37,23 @@ class FileMetadata(WorkflowStep):
     def __deepcopy__(self, memo, new_parent=None):
         new = FileMetadata( new_parent if new_parent else self.parent)    
         new.datetime  = copy.deepcopy( self.datetime )
-        new.thumbnail  = copy.deepcopy( self.thumbnail )
         new.year = copy.deepcopy( self.year )
         new.month = copy.deepcopy( self.month )
         new.width, new.height = copy.deepcopy( self.width ), copy.deepcopy( self.height )
         
         return new
         
-    def extract(self):   
+    def extract(self, location):   
         if check_ext(self.parent.filename, img_exts):
-            image = Image.open(self.parent.location)
+            image = Image.open(location)
             self.width, self.height = image.size
         else:
             image = None
              
-        self.extract_datetime(image)
-        self.extract_thumbnail()
-        self.size = os.path.getsize( self.parent.location )
+        self.extract_datetime(image, location)
+        self.size = os.path.getsize( location )
         
-    def extract_datetime(self, image):
+    def extract_datetime(self, image, location):
         self.datetime  = None
         if image:
             info = image._getexif()
@@ -65,46 +63,33 @@ class FileMetadata(WorkflowStep):
                     if decoded == 'DateTime' or decoded == 'DateTimeOriginal':
                         self.datetime  = time.strptime( value, "%Y:%m:%d %H:%M:%S")
             else:
-                logging.debug("info empty for %s   %s" % (self.parent.location, self.parent.filename))
+                logging.debug("info empty for %s   %s" % (location, self.parent.filename))
     
         if not self.datetime :
-            nbs = os.path.getmtime(self.parent.location)
+            nbs = os.path.getmtime(location)
             self.datetime  = time.gmtime(nbs)
         
         self.year    = time.strftime("%Y", self.datetime)
         self.month   = time.strftime("%m", self.datetime)
     
-    def extract_thumbnail(self, path=""):
-        name, ext = os.path.splitext(self.parent.filename)
-        self.thumbnail = os.path.join( path, "." + name + ".thumbnail")
-    
     def __eq__(self, m2):
         return self.datetime == m2.datetime
 
 class File(Versionned):
-    def __init__(self, filename=None, location=None, extracted = False):
+    def __init__(self, md5, filename):
         super().__init__()
         
         self.filename = filename
-        self.location = location
-        self.md5 = None
+        self.md5 = md5
         self.metadata = FileMetadata(self)      
-        self.extracted = extracted  
-        
-        if location and filename and not self.extracted:
-            self.extract()
-        
-        self.garbage_number = c_int(0) #if 0 then data suppressed
-        
+        self.thumbnail = None
+                     
         self.io_lock = threading.Lock() #pour gérer les export concurrant à une suppression si wait vérouiller on ne peut pas supprimer
 
     def __deepcopy__(self, memo):
-        new = File(self.filename, self.location, self.extracted)
-        new.md5 = self.md5
+        new = File(self.md5, self.filename)
+        new.thumbnail = self.thumbnail
         new.metadata = self.metadata.__deepcopy__(None, new)
-        new.garbage_number = self.garbage_number #danger
-        #logging.warning("Warning", "Using file deepcopy, you must ensure that garbage collector is still right")
-        new.extracted = self.extracted #sort du garbage collector si on le copie
         new.io_lock = self.io_lock
         
         return new
@@ -118,42 +103,30 @@ class File(Versionned):
         self.__dict__ = state
         self.io_lock = threading.Lock()
     
-    def extract(self):
-        self.extracted = True
-        with open(self.location, "rb") as f:
+    def extract(self, location): #called only the first time
+        with open(location, "rb") as f:
             self.md5 = hashlib.md5(f.read()).hexdigest()
-            self.metadata.extract()
+            self.metadata.extract(location)
     
-    def create_thumbnails(self):
+    def create_thumbnails(self, location):
         if check_ext(self.filename, img_exts):
-            make_thumbnail( self.location, self.metadata.thumbnail)
+            self.thumbnail = make_thumbnail( location )
         else:
-            shutil.copy2("file_default.png", self.metadata.thumbnail)
-       
-    def store(self, path): 
-        dst = os.path.join(path, self.metadata.year, self.metadata.month)
-        if not os.path.isdir(dst):
-            os.makedirs( dst )
-        dst =  os.path.join(dst, self.filename)
-        
-        flag = True
-        if not os.path.isfile(dst):
-            flag = shutil.copy2( self.location, dst) == dst
-            
-        self.location = dst
-        self.metadata.extract_thumbnail(path)
-        self.create_thumbnails()
-        return flag
+            self.thumbnail = scheduler.add_file( "file_default.png" )#md5 and size can be compute before...once for the whole application
+                   
+    def store(self, location): 
+        scheduler.add_file( location, self.md5, self.metadata.size )
       
     def export_to(self, location):
-        if not os.path.isfile(location):
-            flag = shutil.copy2( self.location, location) == location
+        raise Exception("export_to not rewritte yet")
+        #if not os.path.isfile(location):
+            #flag = shutil.copy2( self.location, location) == location
          
     @io_protect() #la seule à devoir être proteger, du fait de la construction de l'application
-    def remove(self):      
-        if os.path.isfile(self.location):
-            os.remove( self.location )
-            
-        if os.path.isfile(self.metadata.thumbnail):
-            os.remove( self.metadata.thumbnail )
+    def remove(self):   
+        if self.thumbnail:
+            scheduler.remove( self.thumbnail )
+        
+        if self.md5:
+            scheduler.remove( self.md5 )
 

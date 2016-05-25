@@ -2,11 +2,10 @@ from tkinter import messagebox
 from PIL.ExifTags import TAGS
 
 
-import os.path
+import os.path, os
 import pickle
 import hashlib
 import time
-import shutil
 import random
 import logging
 import copy
@@ -19,21 +18,22 @@ from lipyc.utility import io_protect, check_ext
 from lipyc.Album import Album
 from lipyc.File import File
 from lipyc.autologin import *
+from lipyc.scheduler import scheduler
+import lipyc.crypto 
 
 class Library(WorkflowStep):
-    def __init__(self, location, load=True):
+    def __init__(self, location, load=True): #location where metada are stored
         if load and not os.path.isdir( location ):
             raise Exception("Cannot load, invalid location")
         
-        self.files = {} # ordered by hash
+        
         self.albums = set() #orderder by id
         self.inner_albums = {}#years, month 
         
         self.io_lock = threading.Lock()
         
         self.location = location
-        if self.location :
-            self.load()
+        self.load()
     
     def __str__(self):
         return ""
@@ -41,7 +41,6 @@ class Library(WorkflowStep):
     def __deepcopy__(self, memo):
         new = Library(self.location, False)
         
-        new.files = copy.deepcopy( self.files)
         new.albums = copy.deepcopy( self.albums)
         new.inner_albums = copy.deepcopy( self.inner_albums)
         
@@ -52,13 +51,10 @@ class Library(WorkflowStep):
         
     @io_protect()
     def load(self):
-        files = ["files.lib", "albums.lib", "inner_albums.lib"]
+        files = ["albums.lib", "inner_albums.lib"]
         for filename in files:
             if not os.path.isfile( os.path.join(self.location, filename) ) :
                 return False
-
-        with open( os.path.join(self.location, "files.lib"), 'rb') as f:
-            self.files = pickle.load(f)
             
         with open( os.path.join(self.location, "albums.lib"), 'rb') as f:
             self.albums = pickle.load(f)
@@ -68,9 +64,6 @@ class Library(WorkflowStep):
        
     @io_protect()
     def store(self):
-        with open( os.path.join(self.location, "files.lib"), 'wb') as f:
-            pickle.dump(self.files, f, pickle.HIGHEST_PROTOCOL)
-            
         with open( os.path.join(self.location, "albums.lib"), 'wb') as f:
             pickle.dump(self.albums, f, pickle.HIGHEST_PROTOCOL)
             
@@ -78,16 +71,15 @@ class Library(WorkflowStep):
             pickle.dump(self.inner_albums, f, pickle.HIGHEST_PROTOCOL)
      
     @io_protect()
-    def add_file(self, _file):
-        if _file.md5 in self.files :
-            if _file.metadata == self.files[_file.md5].metadata :
-                return True
-            else:
-                logging.debug("Metadatas don't match %s %s" %(self.files[self._file].location, _file.location))
-                return False # or run manual check
+    def add_file(self, afile, file_location):
+        if afile.md5 in scheduler : #dedup des objs python
+            return True
         
-        _file.store(self.location)
-        year, month =  (_file.metadata.year, _file.metadata.month)
+        afile.extract(file_location)
+        afile.create_thumbnails(file_location) 
+        afile.store(file_location)
+        
+        year, month =  (afile.metadata.year, afile.metadata.month)
         
         if (year, month) not in self.inner_albums:
             if year not in self.inner_albums:
@@ -103,8 +95,7 @@ class Library(WorkflowStep):
             y_album.add_subalbum( m_album )
 
             self.inner_albums[ (year, month) ] = m_album
-        self.inner_albums[ (year, month) ].add_file( _file, self.location)
-        self.files[_file.md5]= _file
+        self.inner_albums[ (year, month) ].add_file( afile )
         
     def add_directory(self, location):
         th = threading.Thread(None, self.inner_add_directory, None, (location,))
@@ -116,9 +107,9 @@ class Library(WorkflowStep):
     def inner_add_directory(self, location):
         for path, dirs, files in os.walk(location):
             for filename in files:
-                if check_ext(filename) :                    
-                    tmp = File(filename, os.path.join(path, filename))                    
-                    self.add_file( File(filename, os.path.join(path, filename)) )
+                if check_ext(filename) :  
+                    file_location = os.path.join(path, filename)
+                    self.add_file( File(lipyc.crypto.md5( file_location ), filename), file_location )
             
     @io_protect()
     def add_album(self, album):
@@ -135,7 +126,8 @@ class Library(WorkflowStep):
             self.albums.discard( album )
             album.decr_all()
             if album.cover :
-                os.remove( album.cover )
+                schedule.removeafile( album.thumbnail )
+                #os.remove( album.cover )
                 
 
 

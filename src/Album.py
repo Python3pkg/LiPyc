@@ -1,10 +1,9 @@
 from PIL import Image
 
-import os.path
+import os.path,os
 import pickle
 import hashlib
 import time
-import shutil
 import random
 import logging
 import copy
@@ -17,6 +16,7 @@ from lipyc.utility import recursion_protect
 from lipyc.Version import Versionned
 from lipyc.config import *
 from lipyc.utility import check_ext, make_thumbnail
+from lipyc.scheduler import scheduler
 
 from tkinter import messagebox
 
@@ -28,20 +28,17 @@ class Album(Versionned): #subalbums not fully implemented
         self.datetime = datetime if datetime else time.gmtime()
         self.subalbums = set()
         
-        self.cover = None
+        self.thumbnail = scheduler.add_file( **thumbnails["album"] )
         self.files = set() #order by id
         self.inner_keys = [] #use for inner albums
         
     def rename(self, name):
         self.name = name
         
-    def add_file(self, _file, path):
-        if self.cover == None and  _file.metadata.thumbnail :
-            if not os.path.isdir( os.path.join( path, ".cover")):
-                os.makedirs( os.path.join( path, ".cover") )
-            self.set_cover( _file.metadata.thumbnail, path )
-            
-        _file.garbage_number.value += 1
+    def add_file(self, _file):
+        if self.thumbnail == None and  _file.thumbnail :
+            self.thumbnail = scheduler.duplicate_file( _file.thumbnail )
+
         self.files.add(_file)
         
     def remove_file(self, _file, md5map):#va falloir enrichir le msg
@@ -89,8 +86,8 @@ class Album(Versionned): #subalbums not fully implemented
         if album in self.subalbums:
             album.decr_all()
             
-            if album.cover :
-                os.remove( album.cover)
+            if album.thumbnail :
+                scheduler.remove_file( album.thumbnail )
             self.subalbums.discard( album )
     
     @recursion_protect()
@@ -113,17 +110,14 @@ class Album(Versionned): #subalbums not fully implemented
         for album in self.subalbums:
             album.lock_files()   
     
-    def set_cover(self, location, path):
-        if self.cover :
-            os.remove(self.cover)
-        
-        self.cover = os.path.join( path, ".cover" , str(id(self)) + ".thumbnail")
-
+    def set_thumbnail(self, location):
+        if self.thumbnail :
+            scheduler.remove_file(self.thumbnail)
         
         if check_ext(location, img_exts):
-            make_thumbnail( location, self.cover)
+            self.thumbnail = make_thumbnail( location )
         else:
-            shutil.copy("album_default.png", self.cover)
+            self.thumbnail = scheduler.add_file("album_default.png") #size and md5  ought to be combute once for all
     
     @recursion_protect(0)
     def __len__(self): #number of file in dir and subdir
