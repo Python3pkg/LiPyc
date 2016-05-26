@@ -424,7 +424,7 @@ class Application(Tk, WorkflowStep):
             self.refresh()
             
     def remove_album(self, album, refresh=False):#surtout pas de thread io
-        album.remove_all(self.library.files)
+        album.remove_all()
 
         if self.parents_album:
             self.parents_album[-1].remove_subalbum( album )

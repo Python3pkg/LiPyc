@@ -125,8 +125,8 @@ class File(Versionned):
     @io_protect() #la seule à devoir être proteger, du fait de la construction de l'application
     def remove(self):   
         if self.thumbnail:
-            scheduler.remove( self.thumbnail )
+            scheduler.remove_file( self.thumbnail )
         
         if self.md5:
-            scheduler.remove( self.md5 )
+            scheduler.remove_file( self.md5 )
 

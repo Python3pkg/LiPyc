@@ -124,10 +124,9 @@ class Library(WorkflowStep):
         
         if album in self.albums:
             self.albums.discard( album )
-            album.decr_all()
-            if album.cover :
-                schedule.removeafile( album.thumbnail )
-                #os.remove( album.cover )
+
+            if album.thumbnail :
+                scheduler.remove_file( album.thumbnail )
                 
 
 

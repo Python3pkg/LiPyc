@@ -3,10 +3,8 @@
 -> migration vers SQLite
 -> en display mod un suivant prcedent pour faire défile les photos avec un link a fleche gauche droite, de même pour ce deplace dans pagination
 -> cache d'image pour miniature principalement, on pourrait le mettre au niveau du gestionnaire de fichier
--> rewrite with GTK+
 -> set cover depuis une picture
 -> outil de restauration pour scheduler
--> scheduler thread-safe
 -> stocker les clées sous forme chiffrées par demande de mdp au démarrage
 Doc : 
 add_to marche

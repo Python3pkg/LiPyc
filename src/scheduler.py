@@ -10,10 +10,11 @@ import logging
 import shutil
 import tempfile
 import pickle
+import threading
+
 from random import random
 
 def wrand(seed, value):
-    #speed, the placement groupe, pool id etc
     a, b = 6364136223846793005, 1
     
     return a * ((a * seed + b) ^ value ) + b; 
@@ -151,6 +152,7 @@ class Bucket: #décrit un dossier ex: photo, gdrive, dropbox
         fp.seek(last)
     
     def remove(self, md5, size):
+        print("Removed", size)
         self.free_capacity += size        
         assert(self.free_capacity <= self.max_capacity)
         os.remove( make_path(self.path, md5) )
@@ -228,11 +230,9 @@ class PG(Container):
         
         return child.access( key )
         
-        
     def buckets(self):
         return itertools.chain( map( Pool.children, self.children ))
         
-
 class Scheduler(Container):
     def __init__(self, replicat=2):
         super().__init__()
@@ -243,6 +243,11 @@ class Scheduler(Container):
         self.passive = True #no data yet
         self.files = {} #ensemble des fichiers gérés : md5 => size, number(nombre de creation)
         
+        self.db_lock = threading.Lock()
+        self.locks = {}#md5=>num_read,write_lock
+        
+        
+    
     def place_(self, key):
         pgs = sorted(self.pgs, key = lambda obj:wrand( obj._id, key))
         return [pg for _,pg in zip( range(self.replicat), pgs) ]
@@ -267,6 +272,7 @@ class Scheduler(Container):
                 return bucket
         
         return buckets[-1] 
+    
         
     def add_file(self, fp, md5=None, size=None ): #current location of the file, fp location or file descriptor
         self.passive = False
@@ -284,58 +290,103 @@ class Scheduler(Container):
         if md5 in self.files: #deduplication ici
             return md5
             
-            
-        key = int(md5, 16)
-        assert(len(list(self.place(key, 0))) == self.replicat)
-        for bucket in self.place(key, size):
-            bucket.write( md5, size, fp )
+        with self.db_lock: #thread protection
+            if not md5 in self.locks:
+                self.locks[md5]= {"read":0, "write":threading.Lock()}
+            condition = threading.Condition(self.locks[md5]["write"])
         
-        if md5 not in self.files:
-            self.files[md5] = [size,0]
-        else:
-            self.files[md5][1] += 1
-        for pg in self.pgs:
-            print(pg)
-        #raise Exception("")
-        return md5
-    def __str__(self):
-        return str(self.pgs)    
-    def __contains__(self, item):
-        return item in self.files
+        with condition:
+            condition.wait_for(lambda _=None: self.locks[md5]["read"]==0 )    
+            
+            key = int(md5, 16)
+            assert(len(list(self.place(key, 0))) == self.replicat)
+            for bucket in self.place(key, size):
+                bucket.write( md5, size, fp )
+            
+            if md5 not in self.files:
+                self.files[md5] = [size,0]
+            else:
+                self.files[md5][1] += 1
+            for pg in self.pgs:
+                print(pg)
+                
+            #raise Exception("")
+            return md5
+            
+    def __contains__(self, md5):
+        with self.db_lock:
+            if not md5 in self.locks:
+                self.locks[md5]= {"read":0, "write":threading.Lock()}
+                
+        with self.locks[md5]["write"]:
+            return md5 in self.files
      
     def duplicate_file(self, md5):
-        self.files[md5][1]+=1
-        return md5
+        with self.db_lock:
+            if not md5 in self.locks:
+                self.locks[md5]= {"read":0, "write":threading.Lock()}
+                
+        with self.locks[md5]["write"]:
+            self.files[md5][1]+=1
+            return md5
         
     def remove_file(self, md5):
-        self.passive = False
-        self.files[md5][1] -= 1
-        if self.files[md5][0] > 0:
-            return 
-            
-        key = int(md5, 16)
+        with self.db_lock: #thread protection
+            if not md5 in self.locks:
+                self.locks[md5]= {"read":0, "write":threading.Lock()}
+            condition = threading.Condition(self.locks[md5]["write"])
         
-        for bucket in self.place(key, -1*size):
-            bucket.remove(md5, self.files[md5])
-            
-        del self.files[md5]
+        with condition:
+            condition.wait_for(lambda _=None: self.locks[md5]["read"]==0 )   
+        
+        
+            for pg in self.pgs:
+                print(pg)
+            self.passive = False
+            self.files[md5][1] -= 1
+            print("Removed fdsfffffffffffffffffffffffffff", self.files[md5][1])
+
+            if self.files[md5][1] > 0:
+                return 
+            print("Removed")
+            key = int(md5, 16)
+
+            for bucket in self.place(key, -1 * self.files[md5][0]):
+                bucket.remove(md5, self.files[md5][0])
+                
+            del self.files[md5]
+            for pg in self.pgs:
+                print(pg)
 
     def get_file(self, md5):
+        with self.db_lock: #thread protection
+            if not md5 in self.locks:
+                self.locks[md5]= {"read":0, "write":threading.Lock()}
+        
+        with self.locks[md5]["write"]:
+            self.locks[md5]["read"] += 1
+            
         print(md5)
         if md5 not in self.files:
+            self.locks[md5]["read"] -= 1
             return None
 
         key = int(md5, 16)        
         bucket = self.access(key)
         if not bucket.crypt:
+            self.locks[md5]["read"] -= 1
             return open( make_path(bucket.path, md5), "rb")
         else:
             cipher = AESCipher(bucket.aeskey)
             fp2 = tempfile.TemporaryFile(mode="r+b")
             with open(make_path(bucket.path, md5), "rb") as fp:
                 cipher.decrypt_file( fp, fp2)
+            self.locks[md5]["read"] -= 1
             return fp2
     
+    #all method below are not thread safe
+    def __str__(self):
+        return str(self.pgs)    
     def add_pg(self, pg):
         if self.passive:
             return super().add(pg)
@@ -428,10 +479,13 @@ class Scheduler(Container):
 
 scheduler=Scheduler()  #variable globale pour l'application jusqu'à ce que je troouve une meilleur idée (FUSE : Linux, Mac)
 scheduler.load()
-#print("===================================================")
-#test_files = ["file_default.png", "album_default.png", "pgs.json"]
-#for loc in test_files:
-    #tmp = scheduler.get_file( scheduler.add_file(loc) )
-    #assert( lipyc.crypto.md5(tmp) == lipyc.crypto.md5(loc))
-    #tmp.close()
-#raise Exception("End")
+print("===================================================")
+test_files = ["file_default.png", "album_default.png", "pgs.json"]
+for loc in test_files:
+    m = scheduler.add_file(loc)
+    tmp = scheduler.get_file( m )
+    assert( lipyc.crypto.md5(tmp) == lipyc.crypto.md5(loc))
+    tmp.close()
+    scheduler.remove_file(m)
+
+raise Exception("End")

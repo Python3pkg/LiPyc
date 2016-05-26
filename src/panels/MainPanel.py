@@ -274,8 +274,11 @@ class Tile(Panel):
             
     def set_file(self, _file):  
         self.title.pack_forget()
-    
-        return lambda event: self.app.display_file( _file ), lambda event: self.app.select( _file )
+        
+        def callback1(event):
+            self.app.parents_album.append( self.app.parents_album[-1] )
+            self.app.display_file( _file )
+        return callback1, lambda event: self.app.select( _file )
         
     def refresh(self):
         self.set(self.obj)

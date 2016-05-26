@@ -41,51 +41,25 @@ class Album(Versionned): #subalbums not fully implemented
 
         self.files.add(_file)
         
-    def remove_file(self, _file, md5map):#va falloir enrichir le msg
-        if _file.garbage_number.value == 1 and not messagebox.askyesno("Warning", "This is the last copy of this picture %s, do you really want to remove it ?" % _file.filename):
-            return None
-            
-        self.files.discard(_file)
-        _file.garbage_number.value -= 1
-        
-        if _file.garbage_number.value == 0:
-            del md5map[_file.md5]
-            _file.remove()
+    def remove_file(self, _file):
+        self.files.discard(_file)       
+        _file.remove()
     
     @recursion_protect()
-    def remove_all(self, md5map):
+    def remove_all(self):
         for album in list(self.subalbums):
-            album.remove_all(md5map)
+            album.remove_all()
         self.subalbums.clear()
         
         for _file in list(self.files):
-            self.remove_file(_file, md5map)
+            self.remove_file(_file)
         self.files.clear()
         
     def add_subalbum(self, album):
         self.subalbums.add( album )
-        album.incr_all()
-        
-    @recursion_protect()
-    def incr_all(self):
-        for _file in self.files:
-            _file.garbage_number.value += 1
-        
-        for album in self.subalbums:
-            album.incr_all()
-    
-    @recursion_protect()
-    def decr_all(self): 
-        for _file in self.files:
-            _files.garbage_number.value -= 1
-        
-        for album in self.subalbums:
-            album.decr_all()
     
     def remove_subalbum(self, album):
-        if album in self.subalbums:
-            album.decr_all()
-            
+        if album in self.subalbums:           
             if album.thumbnail :
                 scheduler.remove_file( album.thumbnail )
             self.subalbums.discard( album )
