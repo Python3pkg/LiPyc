@@ -58,7 +58,7 @@ class TopPanel(Panel):
             
         self.last_action = ""
         self.last_parents = 0
-            
+        self.last_k = -1
         for k in range(max_buttons):
             tmp = Frame(self)
             tmp.button = Button(tmp)
@@ -154,10 +154,12 @@ class TopPanel(Panel):
     def set_display(self):     
         if self.last_action == "display":
             return None
-        self.last_action = "display"   
-        
-        texts=["Back"]
-        callbacks=[self.app.back]
+        self.last_action = "display"
+           
+        texts=["Back", "Previous","Next"]
+        callbacks=[self.app.back, 
+        self.app.display_previous, 
+        self.app.display_next]
         
         self.set_buttons( texts, callbacks)
         
@@ -272,18 +274,18 @@ class Tile(Panel):
         
         return _display, lambda event : self.app.select( album )
             
-    def set_file(self, _file):  
+    def set_file(self, _file, k):  
         self.title.pack_forget()
         
         def callback1(event):
             self.app.parents_album.append( self.app.parents_album[-1] )
-            self.app.display_file( _file )
+            self.app.display_file( _file, k )
         return callback1, lambda event: self.app.select( _file )
         
     def refresh(self):
         self.set(self.obj)
         
-    def set(self, obj):
+    def set(self, obj, k):
         if self.selected != (obj in self.app.selected):
             self.configure(bg="blue" if obj in self.app.selected else "white")
             self.selected = obj in self.app.selected
@@ -296,7 +298,7 @@ class Tile(Panel):
         if isinstance(obj, Album):
             callback1, callback2 = self.set_album(obj)
         else:
-            callback1, callback2 = self.set_file(obj)
+            callback1, callback2 = self.set_file(obj, k)
         
         self.obj = obj
         self.version = obj.version()
@@ -343,10 +345,11 @@ class PaginationPanel(VScrolledPanel):
         if objs:
             tmp = objs.pop()
             objs.add( tmp )
-            objs = sorted( objs, key=sort_functions[self.app.sortname][type(tmp)])
+            objs = list(sorted( objs, key=sort_functions[self.app.sortname][type(tmp)]))
+            self.app.last_objs = objs
 
         for i in range(0, min(len(objs), len(self.tiles))):
-            self.tiles[i].set( objs[i] )
+            self.tiles[i].set( objs[i], i )
             self.tiles[i].show()
             
             
@@ -355,6 +358,53 @@ class PaginationPanel(VScrolledPanel):
             self.tiles[i].hide()
         
         self.last_len = min( len(objs), len(self.tiles))
+
+#class SchedulerPanel(VScrolledPanel): not needed already pgs.json 
+    #def __init__(self, app, master, *args, **kwargs):
+        #super().__init__(master, bg="white", *args, **kwargs)
+        #self.canvas.configure(height=480)
+        
+        #self.app = app
+        
+        #self.pg_frames = []
+         
+    #def refresh(self):
+        #pass
+            
+    #def make_bucket(self, bucket, frame):
+        #pass
+        
+    #def make_container(self, container, parent, frame):
+        #name=StringVar()
+        #name.set( container.name )
+        #name_e = Entry(frame, textvariable=name, width=15)
+        #name_e.pack()
+        
+        #b_rename = Button(self.pg_frames[-1], text="Rename", command=lambda _=None:container.set_name( name.get()))
+        #b_rename.pack()
+        #b_remove = Button(self.pg_frames[-1], text="Delete", command=lambda _=None:parent.remove(container))
+        #b_remove.pack()
+        
+        #aeskey=StringVar()
+        #aeskey.set( container.aeskey )
+        #aeskey_e = Entry(frame, textvariable=aeskey, width=15)
+        #aeskey_e.pack()
+        #b_aeskey = Button(frame, text="Change key", command=lambda _=None:container.set_aeskey(aeskey.get()) )
+        #b_aeskey.pack()
+        
+        #f_children = Frame(frame)
+        #f_children.pack()
+        #for child in container.children:
+            #if isinstance(child, Bucket):
+                #self.make_bucket(chikd, container, f_children)
+            #else:
+                #self.make_container(child, container, f_children)
+            
+    #def set(self, objs):        
+        #for pg in scheduler.pgs:
+            #self.pg_frames.append( Frame(self) )
+            #self.pg_frames[-1].pack() 
+            #self.make_container(pg, scheduler, self.pg_frames[-1])
 
 class DisplayPanel(Panel):
     def __init__(self, app, master, *args, **kwargs):
@@ -437,7 +487,7 @@ class MainPanel(Panel):
         
         self.bottomPanel.show()
         
-    def set_display(self, obj):
+    def set_display(self, obj):#k position app.last_objs
         if self.centerPanel != self.centers["display"]:
             self.centerPanel.hide()
             

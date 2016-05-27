@@ -11,6 +11,7 @@ import shutil
 import tempfile
 import pickle
 import threading
+import collections
 
 from random import random
 
@@ -52,6 +53,13 @@ def counter(cls):
     setattr(cls, "__get_id__", lambda _=None: cls._id)
 
     return cls
+
+def sizeof_fmt(num, suffix='B'):
+    for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
+        if abs(num) < 1024.0:
+            return "%3.1f%s%s" % (num, unit, suffix)
+        num /= 1024.0
+    return "%.1f%s%s" % (num, 'Yi', suffix)
 
 #speed use only to select : read replicat
 #nom => identifiant unique pour l'utilisateur(au sein d'un mêm parent)
@@ -160,8 +168,8 @@ class Bucket: #décrit un dossier ex: photo, gdrive, dropbox
         buff="%sBucket %d: %s, %d/%d : %f\n" % (ident, self._id, self.name, self.free_capacity, self.max_capacity, float(self.free_capacity)/(float(self.max_capacity)))
 
         return buff
-@counter
 
+@counter
 class Pool(Container):  #on décrit un disque par exemple avec pool
     def make(name, json_pool, aeskey):#config json to pool
         pool = Pool(name)
@@ -304,7 +312,7 @@ class Scheduler(Container):
                 bucket.write( md5, size, fp )
             
             if md5 not in self.files:
-                self.files[md5] = [size,0]
+                self.files[md5] = [size,1]
             else:
                 self.files[md5][1] += 1
             for pg in self.pgs:
@@ -460,6 +468,7 @@ class Scheduler(Container):
         for pg in self.pgs:
             print(pg)
         #raise Exception("")
+        
     def store(self):
         with open("files.json", "w") as f :
             json.dump(self.files, f)
@@ -474,18 +483,39 @@ class Scheduler(Container):
             
             pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
     
+    def info(self):        
+        measurement_unit = 1024*1024#calcul exacte par raport à l'unité choisie(heuristic....)
+
+        
+        mc = int(sum( [int(pg.max_capacity / measurement_unit) for pg in self.pgs])/self.replicat) 
+        fc = int(sum( [int(pg.free_capacity / measurement_unit) for pg in self.pgs])/self.replicat)
+        
+        mc *= measurement_unit
+        fc *= measurement_unit
+        print(mc)
+        report = {
+            "usage": int(100 * float(mc-fc) / float(mc)) if mc > 0 else 0,
+            "capacity": sizeof_fmt(mc-fc),
+            "true_capacity": sizeof_fmt(sum( [ size for size,_ in self.files.values() ] )),
+            "max_capacity": sizeof_fmt(mc),
+            "free_capacity": sizeof_fmt(fc),
+            "replicat": self.replicat,
+            "passive":self.passive
+        }
+        return report
+    
     def buckets(self):
         return itertools.chain( map( Pool.children, self.pgs ))
 
 scheduler=Scheduler()  #variable globale pour l'application jusqu'à ce que je troouve une meilleur idée (FUSE : Linux, Mac)
 scheduler.load()
-print("===================================================")
-test_files = ["file_default.png", "album_default.png", "pgs.json"]
-for loc in test_files:
-    m = scheduler.add_file(loc)
-    tmp = scheduler.get_file( m )
-    assert( lipyc.crypto.md5(tmp) == lipyc.crypto.md5(loc))
-    tmp.close()
-    scheduler.remove_file(m)
+#print("===================================================")
+#test_files = ["file_default.png", "album_default.png", "pgs.json"]
+#for loc in test_files:
+    #m = scheduler.add_file(loc)
+    #tmp = scheduler.get_file( m )
+    #assert( lipyc.crypto.md5(tmp) == lipyc.crypto.md5(loc))
+    #tmp.close()
+    #scheduler.remove_file(m)
 
-raise Exception("End")
+#raise Exception("End")

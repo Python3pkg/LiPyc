@@ -77,6 +77,9 @@ class Application(Tk, WorkflowStep):
         
         self.load()
 
+        self.last_objs  = []
+        self.last_k     = -1
+        
         
     def load(self):
         files = ["general.data"]
@@ -136,9 +139,19 @@ class Application(Tk, WorkflowStep):
         def _keyrelease_event(event): 
             if event.keycode == 37 or event.keycode == 105: #ctrl
                 self.selected_mod = False
-            if event.keycode == 119:
+            elif event.keycode == 119:#supr
                 self.remove( self.selected )
-
+            elif event.keycode == 114:#=>
+                if self.action == Action.display_file:
+                    self.display_next()
+            elif event.keycode == 113:#=>
+                if self.action == Action.display_file:
+                    self.display_previous()
+            elif event.keycode == 111:#up 
+                pass
+            elif event.keycode == 116:#down
+                pass
+            #print("keycode",event.keycode)
         def escape(e):
             if self.parents_album :
                 self.back()
@@ -177,6 +190,8 @@ class Application(Tk, WorkflowStep):
     def display_albums(self, albums):
         self.action = Action.pagination_albums
 
+        self.last_objs = albums
+
         self.mainPanel.set_pagination(albums)
         self.leftPanel.set_pagination(albums)
         self.rightPanel.set_pagination(self.selected)
@@ -188,6 +203,8 @@ class Application(Tk, WorkflowStep):
     def display_files(self, files):
         self.action = Action.pagination_files
         
+        self.last_objs = files
+        
         self.mainPanel.set_pagination(files)
         self.leftPanel.set_pagination(files)
         self.rightPanel.set_pagination(self.selected)
@@ -196,9 +213,10 @@ class Application(Tk, WorkflowStep):
         self.leftPanel.show()
         self.rightPanel.show()
         
-    def display_file(self, _file):
+    def display_file(self, _file, k):#position de files in self.last_objs
         self.action = Action.display_file
-
+        self.last_k = k
+        
         self.mainPanel.set_display(_file)
         self.leftPanel.set_display(_file)
         self.rightPanel.set_display(_file)
@@ -206,6 +224,16 @@ class Application(Tk, WorkflowStep):
         self.mainPanel.show()
         self.leftPanel.show()
         self.rightPanel.show()
+    
+    def display_previous(self):
+        if self.last_k>-1:
+            i = (self.last_k-1)%len(self.last_objs)
+            self.display_file( self.last_objs[i], i)
+        
+    def display_next(self):
+        if self.last_k>-1:
+            i = (self.last_k+1)%len(self.last_objs)
+            self.display_file( self.last_objs[i], i)
 #### End Views               
      
 ## Begin Event Handling
@@ -413,7 +441,7 @@ class Application(Tk, WorkflowStep):
         if not auto :
             self.mainPanel.reset()
         self._refresh()
-        print("Refresh duration %f",  default_timer()-s)
+        #print("Refresh duration %f",  default_timer()-s)
    
     def remove_file(self, _file, refresh=False):#surtout pas de thread io
         self.parents_album[-1].remove_file( _file )
