@@ -88,10 +88,14 @@ class Album(Versionned): #subalbums not fully implemented
         if self.thumbnail :
             scheduler.remove_file(self.thumbnail)
         
-        if check_ext(location, img_exts):
+        if not isinstance(location, str) or check_ext(location, img_exts): #fichier ouvert
+            #self.thumbnail = scheduler.add_file("album_default.png") #size and md5  ought to be combute once for all
             self.thumbnail = make_thumbnail( location )
+            print(self.thumbnail)
+            print(self)
         else:
             self.thumbnail = scheduler.add_file("album_default.png") #size and md5  ought to be combute once for all
+    
     
     @recursion_protect(0)
     def __len__(self): #number of file in dir and subdir

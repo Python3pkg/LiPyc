@@ -253,9 +253,8 @@ class Tile(Panel):
         self.title.pack()
     
     def show(self):
-        #self.grid(row=self.i, column=self.j)
         if self.obj :
-            self.thumbnail.pack()
+            self.thumbnail.pack(padx=BORDER_THUMB/2, pady = BORDER_THUMB/2)
             if isinstance(self.obj, Album):
                 self.title.pack()
     
@@ -264,7 +263,7 @@ class Tile(Panel):
         self.title.pack_forget()
         self.thumbnail.pack_forget()
     
-    def set_album(self, album):  
+    def set_album(self, album, k):  
         def _display(event):
             self.app.parents_album.append(album)
             self.app.action = Action.pagination
@@ -272,7 +271,7 @@ class Tile(Panel):
         
         self.title.configure(text=album.name)
         
-        return _display, lambda event : self.app.select( album )
+        return _display, lambda event : self.app.select( album, k )
             
     def set_file(self, _file, k):  
         self.title.pack_forget()
@@ -280,7 +279,7 @@ class Tile(Panel):
         def callback1(event):
             self.app.parents_album.append( self.app.parents_album[-1] )
             self.app.display_file( _file, k )
-        return callback1, lambda event: self.app.select( _file )
+        return callback1, lambda event: self.app.select( _file, k )
         
     def refresh(self):
         self.set(self.obj)
@@ -289,14 +288,19 @@ class Tile(Panel):
         if self.selected != (obj in self.app.selected):
             self.configure(bg="blue" if obj in self.app.selected else "white")
             self.selected = obj in self.app.selected
+            self.show()
         
         if self.obj == obj and self.version == obj.version() :
             return None
         
-        self.data = ImageTk.PhotoImage( Image.open(scheduler.get_file( obj.thumbnail ) ))
+        if obj.thumbnail in thumbnails_cache:
+            self.data = thumbnails_cache[obj.thumbnail]
+        else:
+            self.data = ImageTk.PhotoImage( Image.open(scheduler.get_file( obj.thumbnail ) ))
+            thumbnails_cache[obj.thumbnail] = self.data
         
         if isinstance(obj, Album):
-            callback1, callback2 = self.set_album(obj)
+            callback1, callback2 = self.set_album(obj, k)
         else:
             callback1, callback2 = self.set_file(obj, k)
         
@@ -431,28 +435,37 @@ class DisplayPanel(Panel):
         self.obj = obj
         self.version = obj.version()
             
-        im=Image.open( scheduler.get_file( obj.md5) )
-        
-        width, height = im.size
-        ratio = float(width)/float(height)
-        if float(width)/float(DISPLAY_WIDTH) < float(height)/float(DISPLAY_HEIGHT):
-            height = min(height, DISPLAY_HEIGHT)
-            width = int(ratio * height)
+            
+        if obj.md5 in files_cache:
+            offset_width, offset_height, self.data = files_cache[obj.thumbnail]
         else:
-            width = min(width, DISPLAY_WIDTH)
-            height = int(width / ratio)
+            im=Image.open( scheduler.get_file( obj.md5) )
+            
+            width, height = im.size
+            ratio = float(width)/float(height)
+            if float(width)/float(DISPLAY_WIDTH) < float(height)/float(DISPLAY_HEIGHT):
+                height = min(height, DISPLAY_HEIGHT)
+                width = int(ratio * height)
+            else:
+                width = min(width, DISPLAY_WIDTH)
+                height = int(width / ratio)
             
             
-        offset_width = (DISPLAY_WIDTH - width) / 2
-        offset_height = (DISPLAY_HEIGHT- height) / 2
+            offset_width = (DISPLAY_WIDTH - width) / 2
+            offset_height = (DISPLAY_HEIGHT- height) / 2
+                
+            self.data = ImageTk.PhotoImage(im.resize((width, height), Image.ANTIALIAS))
+            files_cache[obj.thumbnail] = (offset_width, offset_height, self.data)
             
-        self.data = ImageTk.PhotoImage(im.resize((width, height), Image.ANTIALIAS))
         self.thumbnail.delete("all")
         self.thumbnail.create_image(offset_width, offset_height, anchor=NW, image=self.data) 
             
 class MainPanel(Panel):
     def __init__(self, app, master, num_x=6, num_y=6, max_buttons=5, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
+        
+        self.num_x = num_x
+        self.num_y = num_y
         
         self.topPanel = TopPanel(app, self, max_buttons)
         self.topPanel.grid(row=0, column=0)

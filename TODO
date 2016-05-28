@@ -1,14 +1,7 @@
 -> search
 -> album/image tag 
--> migration vers SQLite
--> en display mod un suivant prcedent pour faire défile les photos avec un link a fleche gauche droite, de même pour ce deplace dans pagination
--> cache d'image pour miniature principalement, on pourrait le mettre au niveau du gestionnaire de fichier
--> set cover depuis une picture
--> outil de restauration pour scheduler
--> stocker les clées sous forme chiffrées par demande de mdp au démarrage
-Doc : 
-add_to marche
-move_to marche
-copy_to marche
+-> migration pikle vers SQLite(qqch un peu plus robuste )
+-> outil(s) de restauration pour scheduler
+-> chiffré les clés aes à l'aide d'un mdp au démarrage
 
 attentino add_to et copy_to pareil pour un fichier

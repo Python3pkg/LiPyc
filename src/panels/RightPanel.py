@@ -129,7 +129,10 @@ class ActionPanel(Panel):
         self.b_copyto.grid(row=2, column=1)
         self.b_copyto = Button(self.b_bar, text="Move to", command = lambda _=None : self.app.move_to( self.map_albums[self.tree.focus()] if self.tree.focus() else None ))
         self.b_copyto.grid(row=2, column=2)
-    
+        self.b_set_cover = Button(self.b_bar, text="Set cover", command =lambda _=None:None)
+        #self.b_set_cover.grid(row=3, column=0)
+        
+        
         self.albums_map = {}
         self.map_albums = {}
         self.current = 0
@@ -142,6 +145,7 @@ class ActionPanel(Panel):
             self.albums_map[ elt ] = str(self.current)
             self.map_albums[ str(self.current) ] = elt
             self.current += 1
+
         
         f = set()
         
@@ -158,13 +162,32 @@ class ActionPanel(Panel):
                 self.albums_map[ elt ] = str(self.current)
                 self.map_albums[ str(self.current) ] = elt
                 self.current += 1
-    
     def set(self): #Must be called after each addition/removal/rename of an album
         self.tree.delete(*self.tree.get_children())
         self.make_tree()
             
         self.grid()
+    
+    def set_display(self, obj):
+        self.b_set_cover.configure(command= lambda _=None : self.app.set_cover_from( self.map_albums[self.tree.focus()] if self.tree.focus() else None, obj ))
+        self.b_set_cover.grid()
+    
+    def set_pagination(self, objs):
+        if not objs:
+            self.b_set_cover.grid_forget()
+            return 
+            
+        obj = objs.pop()
+        objs.add(obj)
+        if len(objs) > 1:
+            self.b_set_cover.grid_forget()
+        elif isinstance(obj, File):
+            self.b_set_cover.configure(command= lambda _=None : self.app.set_cover_from( self.map_albums[self.tree.focus()] if self.tree.focus() else None, obj ))
+            self.b_set_cover.grid()
+        else:
+            self.b_set_cover.grid_forget()
 
+    
 class RightPanel(Panel):
     def __init__(self, app, master, *args, **kwargs):
         super().__init__(master, width=150, *args, **kwargs)
@@ -182,9 +205,13 @@ class RightPanel(Panel):
         
         self.objs = None
         self.versions = None
+        self.objs = None
+        self.versions = None
     
     def set_display(self, obj):
-        self.actionPanel.hide()
+        self.actionPanel.set_display(obj)
+        self.actionPanel.show()
+        
         if self.objs == [obj] and [obj.version()] == self.versions:
             return None
             
@@ -201,13 +228,13 @@ class RightPanel(Panel):
         self.infoPanel.set_buttons( ["Remove"], [_remove] )
         
         self.infoPanel.show()
-        self.actionPanel.hide()
+        self.actionPanel.set_display(obj)
+        self.actionPanel.show()
         
         self.objs = {obj}
         self.versions = [obj.version()]
     
     def set_pagination_unaire(self, obj):
-        print("redrax")
         if isinstance(obj, File) :
             labels_texts= [
                 obj.filename,
@@ -264,10 +291,10 @@ class RightPanel(Panel):
         self.infoPanel.set_buttons(buttons_texts, callbacks)
     
     def set_pagination(self, objs):
-        print(self.objs == objs)
-        if self.objs == objs and [obj.version() for obj in objs] == self.versions:
+
+        if self.objs == objs and [obj.version() for obj in objs] == self.versions :
             return None
-        
+
         if objs :    
             if len(objs) == 1:
                 self.set_pagination_unaire( list(objs)[0] )
@@ -275,6 +302,8 @@ class RightPanel(Panel):
                 self.set_pagination_multpile( objs )
             
             self.infoPanel.show()
+            
+            self.actionPanel.set_pagination(objs)
             self.actionPanel.show()
         else:
             self.infoPanel.hide()

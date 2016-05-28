@@ -104,7 +104,7 @@ class Container:
         
         r = int(obj.free_capacity / min_obj.free_capacity)
         self._min_obj = obj
-        print("ratio", r)
+
         for k in range(min(r, max_ratio)):
             tmp = copy(obj)
             tmp.max_capacity /= r
@@ -121,7 +121,6 @@ class Container:
 @counter        
 class Bucket: #décrit un dossier ex: photo, gdrive, dropbox
     def make(name, json_bucket, aeskey):
-        print(json_bucket)  
         return Bucket(path=json_bucket["path"], 
             max_capacity=json_bucket["max_capacity"],
             speed=json_bucket["speed"],
@@ -147,7 +146,6 @@ class Bucket: #décrit un dossier ex: photo, gdrive, dropbox
         
         last = fp.tell()
         fp.seek(0)
-        print("crypt=", self.crypt, self.name)
 
         if self.crypt :
             cipher = AESCipher(self.aeskey)
@@ -160,7 +158,6 @@ class Bucket: #décrit un dossier ex: photo, gdrive, dropbox
         fp.seek(last)
     
     def remove(self, md5, size):
-        print("Removed", size)
         self.free_capacity += size        
         assert(self.free_capacity <= self.max_capacity)
         os.remove( make_path(self.path, md5) )
@@ -186,7 +183,6 @@ class Pool(Container):  #on décrit un disque par exemple avec pool
             
     def place(self, key, size):
         self.free_capacity -= size 
-        print("Place pool %d" % size)
 
         bucket = min( self.children, 
             key = lambda obj:wrand( obj._id, key))
@@ -296,6 +292,7 @@ class Scheduler(Container):
             size = os.fstat(fp.fileno()).st_size
             
         if md5 in self.files: #deduplication ici
+            self.files[md5][1]+=1
             return md5
             
         with self.db_lock: #thread protection
@@ -352,11 +349,9 @@ class Scheduler(Container):
                 print(pg)
             self.passive = False
             self.files[md5][1] -= 1
-            print("Removed fdsfffffffffffffffffffffffffff", self.files[md5][1])
 
             if self.files[md5][1] > 0:
                 return 
-            print("Removed")
             key = int(md5, 16)
 
             for bucket in self.place(key, -1 * self.files[md5][0]):
@@ -374,7 +369,6 @@ class Scheduler(Container):
         with self.locks[md5]["write"]:
             self.locks[md5]["read"] += 1
             
-        print(md5)
         if md5 not in self.files:
             self.locks[md5]["read"] -= 1
             return None
@@ -432,7 +426,6 @@ class Scheduler(Container):
             bucket.remove( md5, size )
         
     def load(self):
-        print("Loading")
         if os.path.isfile("scheduler.data"):
             with open( "scheduler.data", 'rb') as f:
                 data = pickle.load(f)
@@ -440,8 +433,6 @@ class Scheduler(Container):
                 self.files.update(data["files"] )
                 self.replicat = data["replicat"]
                 self.passive = data["passive"]
-                print(self.replicat)
-                print("ffffffffffffffffffffffffffffff")
         else:
             with open("pgs.json", "r") as f: #il faut preserver les ids sinon on ne retrouvera plus les fichiers
                 config = json.load(open("pgs.json"))
@@ -450,21 +441,19 @@ class Scheduler(Container):
                 max_ratio = config["max_ratio"]
                 self.replicat = config["replicat"]
                 aeskey = config["aeskey"] if "aeskey" in config else ""
-                print("pgs", len(config["pgs"]))
+
                 assert( len(config["pgs"]) == len(config["pgs"].keys()))
-                print(config["pgs"].keys())
+
                 pgs=list(config["pgs"].items())
                 for name, json_pg in pgs:
                     tmp = PG.make(name, json_pg, aeskey)
                     self.add( tmp )
-                    print(name)    
         
         if os.path.isfile("files.json"):
             with open("files.json", "r") as f :
                 self.files = json.load(f)
         
         #print(self.files)
-        print( "pgs saved =%d"%len(self.pgs))
         for pg in self.pgs:
             print(pg)
         #raise Exception("")

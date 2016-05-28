@@ -1,4 +1,5 @@
 from enum import Enum
+from lipyc.Cache import ARCCache
 
 import hashlib
 import os
@@ -35,3 +36,8 @@ thumbnails={
         "md5":hashlib.md5(open("file_default.png", "rb").read()).hexdigest(), 
         "size":os.path.getsize("file_default.png")}
 }
+
+
+
+thumbnails_cache = ARCCache( 100 )
+files_cache = ARCCache( 20 )

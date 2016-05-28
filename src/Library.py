@@ -97,8 +97,11 @@ class Library(WorkflowStep):
             self.inner_albums[ (year, month) ] = m_album
         self.inner_albums[ (year, month) ].add_file( afile )
         
-    def add_directory(self, location):
-        th = threading.Thread(None, self.inner_add_directory, None, (location,))
+    def add_directory(self, location, callback):
+        def inner():
+            self.inner_add_directory(location)
+            callback()
+        th = threading.Thread(None, inner(), None)
         th.start()
         
         return th

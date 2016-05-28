@@ -144,14 +144,34 @@ class Application(Tk, WorkflowStep):
             elif event.keycode == 114:#=>
                 if self.action == Action.display_file:
                     self.display_next()
+                elif self.action in [Action.pagination, Action.pagination_albums, Action.pagination_files]:
+                    self.select_next()
             elif event.keycode == 113:#=>
                 if self.action == Action.display_file:
                     self.display_previous()
+                elif self.action in [Action.pagination, Action.pagination_albums, Action.pagination_files]:
+                    self.select_previous()
             elif event.keycode == 111:#up 
-                pass
+                if self.action in [Action.pagination, Action.pagination_albums, Action.pagination_files]:
+                    self.select_up()
             elif event.keycode == 116:#down
-                pass
-            #print("keycode",event.keycode)
+                if self.action in [Action.pagination, Action.pagination_albums, Action.pagination_files]:
+                    self.select_down()
+            elif event.keycode == 36 or event.keycode == 104:#Enter
+                if len(self.selected) == 1:
+                    tmp = self.selected.pop()
+                    self.selected.add( tmp )
+                    
+                    if isinstance(tmp, File):
+                        self.parents_album.append(self.parents_album[-1])
+                        self.display_file(tmp, self.last_k)
+                    else:
+                        self.action = Action.pagination
+                        self.parents_album.append( tmp )
+
+                    self.refresh()
+                        
+
         def escape(e):
             if self.parents_album :
                 self.back()
@@ -177,21 +197,41 @@ class Application(Tk, WorkflowStep):
         self.after(300000, _save)
         self.after(1000, _refresh)
        
-    def select(self, obj):
+    def select(self, obj, k):
         if not self.selected_mod :
             self.selected.clear()
-
+        
+        self.last_k = k
+        
         self.selected.add(obj)
         self.refresh()
     
-
+    def select_previous(self):
+        if self.last_k>-1:
+            i = (self.last_k-1)%len(self.last_objs)
+            self.select( self.last_objs[i], i)
+        
+    def select_next(self):
+        if self.last_k>-1:
+            i = (self.last_k+1)%len(self.last_objs)
+            self.select( self.last_objs[i], i)
+    
+    def select_up(self):
+        if self.last_k>-1:
+            i = (self.last_k-self.mainPanel.num_x)%len(self.last_objs)
+            self.select( self.last_objs[i], i)
+            
+    def select_down(self):
+        if self.last_k>-1:
+            i = (self.last_k+self.mainPanel.num_x)%len(self.last_objs)
+            self.select( self.last_objs[i], i)
 
 #### Begin Views
     def display_albums(self, albums):
         self.action = Action.pagination_albums
 
         self.last_objs = albums
-
+        print(albums)
         self.mainPanel.set_pagination(albums)
         self.leftPanel.set_pagination(albums)
         self.rightPanel.set_pagination(self.selected)
@@ -316,7 +356,7 @@ class Application(Tk, WorkflowStep):
         if not os.path.isdir( location ):
             messagebox.showerror("Error", "Source location : not defined")
             return False
-        self.io_threads.append( self.library.add_directory( location ) )
+        self.io_threads.append( self.library.add_directory( location, self.rightPanel.actionPanel.set ) )
           
     def _export_to(files, albums):
         for _file in files:
@@ -407,7 +447,7 @@ class Application(Tk, WorkflowStep):
         self.rightPanel.actionPanel.set()
         self.refresh()
         
-    def set_cover(self, obj):
+    def set_cover(self, album):
         location = filedialog.askopenfilename()
         if not location :
             return None
@@ -415,7 +455,11 @@ class Application(Tk, WorkflowStep):
         if not os.path.isfile( location ):
             messagebox.showerror("Error", "Invalid cover location")
         
-        obj.set_cover(location, self.library.location)
+        album.set_thumbnail(location)
+        
+    def set_cover_from(self, album, _file):
+        if album:
+            album.set_thumbnail( scheduler.get_file(_file.md5) )
         
     def set_sortname(self, name):
         self.sortname = name
