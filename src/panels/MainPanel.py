@@ -270,10 +270,11 @@ class Tile(Panel):
             self.app.refresh()
         
         self.title.configure(text=album.name)
+        self.title.pack()
         
         return _display, lambda event : self.app.select( album, k )
             
-    def set_file(self, _file, k):  
+    def set_file(self, _file, k): 
         self.title.pack_forget()
         
         def callback1(event):
@@ -490,7 +491,7 @@ class MainPanel(Panel):
         
         if self.centerPanel != self.centers["pagination"]:
             self.centerPanel.hide()
-            
+        
         self.centerPanel = self.centers["pagination"]
         self.centerPanel.set(objs)
         self.centerPanel.show()

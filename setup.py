@@ -2,7 +2,7 @@ from distutils.core import setup
 import os
 
 setup(name="LiPyc",
-        version="0.3.2.dev1",
+        version="0.3.6.dev1",
         description="",
         author="Laurent Prosperi",
         author_email="laurent.prosperi@ens-cachan.fr",

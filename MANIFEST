@@ -4,6 +4,7 @@ file_default.png
 setup.py
 src/Album.py
 src/Application.py
+src/Cache.py
 src/File.py
 src/Library.py
 src/Version.py

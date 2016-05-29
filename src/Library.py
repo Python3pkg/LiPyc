@@ -10,6 +10,7 @@ import random
 import logging
 import copy
 import threading
+import itertools
 
 from math import ceil
 from enum import Enum
@@ -131,6 +132,7 @@ class Library(WorkflowStep):
             if album.thumbnail :
                 scheduler.remove_file( album.thumbnail )
                 
-
+    def deep_files(self):
+        return itertools.chain.from_iterable(map(Album.deep_files, self.albums))
 
  

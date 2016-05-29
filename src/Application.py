@@ -20,6 +20,9 @@ import logging
 import copy
 import threading
 
+
+import itertools
+
 from math import ceil
 from enum import Enum
 
@@ -37,7 +40,7 @@ from lipyc.File import File
 from lipyc.config import *
 from lipyc.autologin import *
 from lipyc.scheduler import scheduler
-
+from lipyc.similarity import find_similarities
 #class Certificat(Enum):
     #add_album = 0
 
@@ -231,7 +234,7 @@ class Application(Tk, WorkflowStep):
         self.action = Action.pagination_albums
 
         self.last_objs = albums
-        print(albums)
+        #print(albums)
         self.mainPanel.set_pagination(albums)
         self.leftPanel.set_pagination(albums)
         self.rightPanel.set_pagination(self.selected)
@@ -252,6 +255,20 @@ class Application(Tk, WorkflowStep):
         self.mainPanel.show()
         self.leftPanel.show()
         self.rightPanel.show()
+    
+    def display_similarities(self, similarities):
+        self.action = Action.pagination_similarities
+        
+        self.last_objs = similarities
+        
+        self.mainPanel.set_pagination(similarities)
+        self.leftPanel.set_pagination(similarities)
+        self.rightPanel.set_pagination(similarities)
+        
+        self.mainPanel.show()
+        self.leftPanel.show()
+        self.rightPanel.show()
+        
         
     def display_file(self, _file, k):#position de files in self.last_objs
         self.action = Action.display_file
@@ -306,6 +323,12 @@ class Application(Tk, WorkflowStep):
             self.display_files( self.parents_album[-1].files)
         else:
             self.display_files([])
+            
+    def show_similarities(self, current=0):
+        self.current = current
+        self.action = Action.pagination_similarities
+
+        self.display_similarities( self.last_objs )
                 
     def show_albums(self, current=0):
         self.current = current
@@ -461,6 +484,23 @@ class Application(Tk, WorkflowStep):
         if album:
             album.set_thumbnail( scheduler.get_file(_file.md5) )
         
+    def find_similarities_inside(self):#permet de reduire la complexité, on fait du On² sur des partitions
+        if self.parents_album:
+            files = self.parents_album[-1].deep_files()
+        else:
+            files = self.library.deep_files()
+        similarities = find_similarities(files, 0.65)
+        #print("Report similarities %d" % len(similarities))
+        if similarities:
+            a, b =similarities[0]
+            set1 = set()
+            set1.add(a)
+            set1.add(b)
+            self.current = 0
+            self.display_similarities(set1)
+            self.action = Action.pagination_similarities
+
+
     def set_sortname(self, name):
         self.sortname = name
         
@@ -477,6 +517,8 @@ class Application(Tk, WorkflowStep):
             self.show_files(self.current)
         elif self.action == Action.pagination_albums:
             self.show_albums(self.current)
+        elif self.action == Action.pagination_similarities:
+            self.show_similarities(self.current)
         elif self.action == Action.display_file:
             pass
         

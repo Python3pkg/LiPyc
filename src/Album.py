@@ -8,7 +8,7 @@ import random
 import logging
 import copy
 import threading
-
+import itertools
 from math import ceil
 from enum import Enum
 
@@ -89,12 +89,13 @@ class Album(Versionned): #subalbums not fully implemented
             scheduler.remove_file(self.thumbnail)
         
         if not isinstance(location, str) or check_ext(location, img_exts): #fichier ouvert
-            #self.thumbnail = scheduler.add_file("album_default.png") #size and md5  ought to be combute once for all
             self.thumbnail = make_thumbnail( location )
-            print(self.thumbnail)
-            print(self)
         else:
             self.thumbnail = scheduler.add_file("album_default.png") #size and md5  ought to be combute once for all
+    
+    def deep_files(self):
+        tmp = itertools.chain.from_iterable(map(Album.deep_files, self.subalbums))
+        return itertools.chain( self.files, tmp)
     
     
     @recursion_protect(0)

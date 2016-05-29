@@ -3,5 +3,12 @@
 -> migration pikle vers SQLite(qqch un peu plus robuste )
 -> outil(s) de restauration pour scheduler
 -> chiffré les clés aes à l'aide d'un mdp au démarrage
+-> système de rapport(vers un serveur perso) : pour controler scheduler, usage cache
+-> gui similarities
+-> face detection and recognition
 
 attentino add_to et copy_to pareil pour un fichier
+
+
+http://www.pyimagesearch.com/2015/07/20/install-opencv-3-0-and-python-3-4-on-ubuntu/
+version3.0.0 pas l'autre

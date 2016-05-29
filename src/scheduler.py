@@ -345,8 +345,8 @@ class Scheduler(Container):
             condition.wait_for(lambda _=None: self.locks[md5]["read"]==0 )   
         
         
-            for pg in self.pgs:
-                print(pg)
+            #for pg in self.pgs:
+                #print(pg)
             self.passive = False
             self.files[md5][1] -= 1
 
@@ -358,8 +358,8 @@ class Scheduler(Container):
                 bucket.remove(md5, self.files[md5][0])
                 
             del self.files[md5]
-            for pg in self.pgs:
-                print(pg)
+            #for pg in self.pgs:
+                #print(pg)
 
     def get_file(self, md5):
         with self.db_lock: #thread protection
@@ -454,8 +454,8 @@ class Scheduler(Container):
                 self.files = json.load(f)
         
         #print(self.files)
-        for pg in self.pgs:
-            print(pg)
+        #for pg in self.pgs:
+            #print(pg)
         #raise Exception("")
         
     def store(self):
@@ -481,7 +481,7 @@ class Scheduler(Container):
         
         mc *= measurement_unit
         fc *= measurement_unit
-        print(mc)
+
         report = {
             "usage": int(100 * float(mc-fc) / float(mc)) if mc > 0 else 0,
             "capacity": sizeof_fmt(mc-fc),

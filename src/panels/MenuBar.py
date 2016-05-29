@@ -30,6 +30,7 @@ class TopMenu(Menu):
         self.make_file()
         self.make_import()
         self.make_export()
+        self.make_functions()
 
     def make_file(self):
         m_file = Menu(self, tearoff=0)
@@ -50,3 +51,7 @@ class TopMenu(Menu):
         #m_export.add_command(label="Export lib to", command= self.app.export_lib_to)
         self.add_cascade(label="Export", menu=m_export)
 
+    def make_functions(self):
+        m_func = Menu(self, tearoff=0)
+        m_func.add_command(label="Find similarities(recursif)", command= self.app.find_similarities_inside)
+        self.add_cascade(label="Functions", menu=m_func)

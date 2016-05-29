@@ -16,6 +16,7 @@ class Action(Enum):
     pagination_albums = 1
     pagination_files = 2
     display_file = 3
+    pagination_similarities = 4
  
 exts   = [ "png", "jpeg", "jpg", "mov", "mp4", "mpg", "thm", "3gp"]
 img_exts = [ "png", "jpeg", "jpg"]
