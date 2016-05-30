@@ -71,7 +71,9 @@ class TopPanel(Panel):
 
             
             self.buttons.append(tmp)
-
+        
+        self.current_pagination = -1
+        self.number = -1
     def set_buttons(self, texts, callbacks ):
         if self.buttons_text == texts and self.buttons_callback == callbacks:
             return None
@@ -162,7 +164,24 @@ class TopPanel(Panel):
         self.app.display_next]
         
         self.set_buttons( texts, callbacks)
+    
+    def set_similarities(self, number):
+        if self.last_action == "similarities" and self.current_pagination == self.app.current_pagination and self.number == number:
+            return None
         
+        self.current_pagination = self.app.current_pagination
+        self.number = number
+        self.last_action = "similarities"
+
+        buttons_text = ["Back"]
+        buttons_callback = [self.app.back]
+        if self.current_pagination > 0:
+            buttons_text.append( "Previous" )
+            buttons_callback.append(self.app.previous_pagination)
+        if self.current_pagination < self.number-1:
+            buttons_text.append( "Next" )
+            buttons_callback.append(self.app.next_pagination)
+        self.set_buttons(buttons_text, buttons_callback)
     def refresh(self):
         None
         
@@ -185,7 +204,7 @@ class PaginationBottomPanel(Panel):
         
         for k in range(max_buttons):
             tmp = Button(self)
-            tmp.grid(row=k+1, column=max_buttons)
+            tmp.grid(row=0, column=k+1)
             tmp.grid_forget()
             
             self.buttons.append(tmp)
@@ -195,14 +214,16 @@ class PaginationBottomPanel(Panel):
             
     def set_label(self, text):
         self.label.configure(text=text)
+        self.label.grid()
     
     def set_buttons(self, texts, callbacks ):
         if self.buttons_text == texts and self.buttons_callback == callbacks:
             return None
         
         for k in range(0, min(len(texts), len(self.buttons))):
+            print(texts[k])
             self.buttons[k].configure( text=texts[k], command=callbacks[k] )
-            self.grid()
+            self.buttons[k].grid(row=0, column=k+1)
             
             self.buttons_text[k] = texts[k]
             self.buttons_callback[k] = callbacks[k]
@@ -216,21 +237,21 @@ class PaginationBottomPanel(Panel):
         if self.current == self.app.current and self.number == number:
             return None
             
-        self.set_label( "Page : %d/%d" % (self.current + 1, 1 + number/self.max_tiles))
+        self.current = self.app.current
+        self.number = number
+        
+        self.set_label( "Page : %d/%d" % (self.current + 1, ceil(float(number)/self.max_tiles)))
         
         buttons_text = []
         buttons_callback = []
         if self.current > 0:
             buttons_text.append( "Previous" )
             buttons_callback.append(self.app.previous_page)
-        if self.current < int(float(number)/float(self.max_tiles)):
+        if self.current+1 < int(number/self.max_tiles):
             buttons_text.append( "Next" )
             buttons_callback.append(self.app.next_page)
         
         self.set_buttons( buttons_text, buttons_callback)
-            
-        self.current = self.app.current
-        self.number = number
 
     def refresh(self):
         self.set_pagination( self.number )
@@ -278,7 +299,8 @@ class Tile(Panel):
         self.title.pack_forget()
         
         def callback1(event):
-            self.app.parents_album.append( self.app.parents_album[-1] )
+            if self.app.parents_album:
+                self.app.parents_album.append( self.app.parents_album[-1] )
             self.app.display_file( _file, k )
         return callback1, lambda event: self.app.select( _file, k )
         
@@ -350,8 +372,8 @@ class PaginationPanel(VScrolledPanel):
         if objs:
             tmp = objs.pop()
             objs.add( tmp )
-            objs = list(sorted( objs, key=sort_functions[self.app.sortname][type(tmp)]))
-            self.app.last_objs = objs
+            objs = list(sorted( objs, key=sort_functions[self.app.sortname][type(tmp)]))[self.app.current*self.num_x*self.num_y:]
+            self.app.set_last_objs(self.app.current_pagination, objs)
 
         for i in range(0, min(len(objs), len(self.tiles))):
             self.tiles[i].set( objs[i], i )
@@ -465,14 +487,13 @@ class MainPanel(Panel):
     def __init__(self, app, master, num_x=6, num_y=6, max_buttons=5, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
         
+        self.app = app
+        
         self.num_x = num_x
         self.num_y = num_y
         
         self.topPanel = TopPanel(app, self, max_buttons)
         self.topPanel.grid(row=0, column=0)
-        
-        self.bottomPanel = PaginationBottomPanel(app, self, max_buttons, num_x*num_y)
-        self.bottomPanel.grid(row=0, column=2)
         
         self.centers = {
             "pagination" : PaginationPanel(app, self, num_x, num_y, height=500),
@@ -480,15 +501,16 @@ class MainPanel(Panel):
         }
         
         for panel in self.centers.values() :
-            panel.grid(row=0, column=1)
+            panel.grid(row=1, column=0)
             panel.hide()
             
         self.centerPanel = self.centers["pagination"]
         self.centerPanel.show()
-    
-    def set_pagination(self, objs):
-        self.bottomPanel.set_pagination(len(objs))
         
+        self.bottomPanel = PaginationBottomPanel(app, self, max_buttons, num_x*num_y)
+        self.bottomPanel.grid(row=2, column=0)
+    
+    def set_pagination(self, objs):        
         if self.centerPanel != self.centers["pagination"]:
             self.centerPanel.hide()
         
@@ -499,6 +521,7 @@ class MainPanel(Panel):
         self.topPanel.set_pagination()
         self.topPanel.show()
         
+        self.bottomPanel.set_pagination(len(objs))
         self.bottomPanel.show()
         
     def set_display(self, obj):#k position app.last_objs
@@ -514,6 +537,21 @@ class MainPanel(Panel):
         
         self.bottomPanel.hide()
     
+    def set_similarities(self, objs):        
+        self.bottomPanel.set_pagination(len(objs))
+        
+        if self.centerPanel != self.centers["pagination"]:
+            self.centerPanel.hide()
+        
+        self.centerPanel = self.centers["pagination"]
+        self.centerPanel.set(objs)
+        self.centerPanel.show()
+        
+        self.topPanel.set_similarities(len(self.app.last_objs))
+        self.topPanel.show()
+        
+        self.bottomPanel.show()
+        
     def refresh(self):
         self.centerPanel.refresh()
         self.topPanel.refresh()

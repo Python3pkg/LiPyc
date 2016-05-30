@@ -1,0 +1,50 @@
+{
+"max_ratio":5,
+"replicat":2,
+"aeskey": "akey of 16/24/32",
+"pgs":{
+    "name_pg1":{
+        "aeskey": "akey of 16/24/32",
+        "pools":{
+            "p1":{
+                "aeskey": "akey of 16/24/32",
+                "buckets":{
+                    "b1_1":{"path":"/home/severus/test_storage_python/1/1", "max_capacity":134217728, "speed":1.0, "crypt":false,
+                        "aeskey": "akey of 16/24/32"
+                    },
+                    "b1_2":{"path":"/home/severus/test_storage_python/1/2", "max_capacity":268435456, "speed":5.0, "crypt":false,
+                        "aeskey": "akey of 16/24/32"
+                    }
+                }
+                },
+            "p2":{
+                "aeskey": "akey of 16/24/32",
+                "buckets":{
+                    "b2_1":{"path":"/home/severus/test_storage_python/2/1", "max_capacity":134217728, "speed":1.0, "crypt":false,
+                        "aeskey": "akey of 16/24/32"
+                    },
+                    "b2_2":{"path":"/home/severus/test_storage_python/2/2", "max_capacity":268435456, "speed":13.1, "crypt":false,
+                        "aeskey": "akey of 16/24/32"
+                    }
+                }
+                }
+            }
+        },
+    "name_pg2":{
+        "aeskey": "akey of 16/24/32",
+        "pools":{
+            "p1":{
+                "aeskey": "akey of 16/24/32",
+                "buckets":{
+                        "b3_1":{"path":"/home/severus/test_storage_python/3/1", "max_capacity":268435456, "speed":0.4, "crypt":false,
+                            "aeskey": "akey of 16/24/32"
+                        },
+                        "b3_2":{"path":"/home/severus/test_storage_python/3/2", "max_capacity":268435456, "speed":0.6, "crypt":false,
+                            "aeskey": "akey of 16/24/32"
+                        }
+                    }
+                }
+            }
+        }
+    }   
+}

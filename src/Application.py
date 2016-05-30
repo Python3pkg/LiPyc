@@ -19,7 +19,7 @@ import random
 import logging
 import copy
 import threading
-
+import collections
 
 import itertools
 
@@ -57,6 +57,7 @@ class Application(Tk, WorkflowStep):
         self.selected_mod = False
 
         self.current = 0 #page number   
+        self.current_pagination = 0#if there is differnet paginations
         self.sortname = "name"
         self.action = Action.pagination_albums
 
@@ -80,7 +81,7 @@ class Application(Tk, WorkflowStep):
         
         self.load()
 
-        self.last_objs  = []
+        self.last_objs  = [[]]#last_objs per pagination
         self.last_k     = -1
         
         
@@ -101,6 +102,8 @@ class Application(Tk, WorkflowStep):
                 self.parents_album = general["parents_album"]
                 self.current = general["current"]
                 self.action = general["action"]
+                self.last_objs = general["last_objs"]
+                
         
         self.refresh()
         
@@ -110,6 +113,7 @@ class Application(Tk, WorkflowStep):
             'parents_album' : self.parents_album,
             'current' : self.current,
             'action' : self.action,
+            'last_objs':self.last_objs,
         }
         with open("general.data", 'wb') as f:
             pickle.dump(general, f, pickle.HIGHEST_PROTOCOL)
@@ -147,18 +151,18 @@ class Application(Tk, WorkflowStep):
             elif event.keycode == 114:#=>
                 if self.action == Action.display_file:
                     self.display_next()
-                elif self.action in [Action.pagination, Action.pagination_albums, Action.pagination_files]:
+                elif self.action in [Action.pagination, Action.pagination_albums, Action.pagination_files, Action.pagination_similarities]:
                     self.select_next()
             elif event.keycode == 113:#=>
                 if self.action == Action.display_file:
                     self.display_previous()
-                elif self.action in [Action.pagination, Action.pagination_albums, Action.pagination_files]:
+                elif self.action in [Action.pagination, Action.pagination_albums, Action.pagination_files, Action.pagination_similarities]:
                     self.select_previous()
             elif event.keycode == 111:#up 
-                if self.action in [Action.pagination, Action.pagination_albums, Action.pagination_files]:
+                if self.action in [Action.pagination, Action.pagination_albums, Action.pagination_files, Action.pagination_similarities]:
                     self.select_up()
             elif event.keycode == 116:#down
-                if self.action in [Action.pagination, Action.pagination_albums, Action.pagination_files]:
+                if self.action in [Action.pagination, Action.pagination_albums, Action.pagination_files, Action.pagination_similarities]:
                     self.select_down()
             elif event.keycode == 36 or event.keycode == 104:#Enter
                 if len(self.selected) == 1:
@@ -211,29 +215,42 @@ class Application(Tk, WorkflowStep):
     
     def select_previous(self):
         if self.last_k>-1:
-            i = (self.last_k-1)%len(self.last_objs)
-            self.select( self.last_objs[i], i)
+            i = (self.last_k-1)%len(self.get_last_objs(self.current_pagination))
+            self.select( self.get_last_objs(self.current_pagination)[i], i)
         
     def select_next(self):
         if self.last_k>-1:
-            i = (self.last_k+1)%len(self.last_objs)
-            self.select( self.last_objs[i], i)
+            i = (self.last_k+1)%len(self.get_last_objs(self.current_pagination))
+            self.select( self.get_last_objs(self.current_pagination)[i], i)
     
     def select_up(self):
         if self.last_k>-1:
-            i = (self.last_k-self.mainPanel.num_x)%len(self.last_objs)
-            self.select( self.last_objs[i], i)
+            i = (self.last_k-self.mainPanel.num_x)%len(self.get_last_objs(self.current_pagination))
+            self.select( self.get_last_objs(self.current_pagination)[i], i)
             
     def select_down(self):
         if self.last_k>-1:
-            i = (self.last_k+self.mainPanel.num_x)%len(self.last_objs)
-            self.select( self.last_objs[i], i)
+            i = (self.last_k+self.mainPanel.num_x)%len(self.get_last_objs(self.current_pagination))
+            self.select( self.get_last_objs(self.current_pagination)[i], i)
+
+    def get_last_objs(self, id_pagination):
+        print(len(self.last_objs), id_pagination)
+        return self.last_objs[id_pagination]
+    
+    def set_last_objs(self, id_pagination, objs):
+        for k in range(len(self.last_objs), max(len(self.last_objs), id_pagination+1)):
+            self.last_objs.append( [] )
+        print(len(self.last_objs), id_pagination)
+        self.last_objs[id_pagination] = list(objs)
+        
 
 #### Begin Views
     def display_albums(self, albums):
         self.action = Action.pagination_albums
-
-        self.last_objs = albums
+        
+        self.set_last_objs(self.current_pagination, albums)
+        
+        #self.last_objs = albums
         #print(albums)
         self.mainPanel.set_pagination(albums)
         self.leftPanel.set_pagination(albums)
@@ -246,7 +263,8 @@ class Application(Tk, WorkflowStep):
     def display_files(self, files):
         self.action = Action.pagination_files
         
-        self.last_objs = files
+        self.set_last_objs(self.current_pagination, files)
+        #self.last_objs = files
         
         self.mainPanel.set_pagination(files)
         self.leftPanel.set_pagination(files)
@@ -259,9 +277,10 @@ class Application(Tk, WorkflowStep):
     def display_similarities(self, similarities):
         self.action = Action.pagination_similarities
         
-        self.last_objs = similarities
-        
-        self.mainPanel.set_pagination(similarities)
+        self.set_last_objs(self.current_pagination, similarities)
+        #self.last_objs = similarities
+        print( similarities)
+        self.mainPanel.set_similarities(similarities)
         self.leftPanel.set_pagination(similarities)
         self.rightPanel.set_pagination(similarities)
         
@@ -284,19 +303,20 @@ class Application(Tk, WorkflowStep):
     
     def display_previous(self):
         if self.last_k>-1:
-            i = (self.last_k-1)%len(self.last_objs)
-            self.display_file( self.last_objs[i], i)
+            i = (self.last_k-1)%len(self.get_last_objs(self.current_pagination))
+            self.display_file( self.get_last_objs(self.current_pagination)[i], i)
         
     def display_next(self):
         if self.last_k>-1:
-            i = (self.last_k+1)%len(self.last_objs)
-            self.display_file( self.last_objs[i], i)
+            i = (self.last_k+1)%len(self.get_last_objs(self.current_pagination))
+            self.display_file( self.get_last_objs(self.current_pagination)[i], i)
 #### End Views               
      
 ## Begin Event Handling
 #### Begin TopPanel
     def back(self):
-        self.parents_album.pop()
+        if self.parents_album:
+            self.parents_album.pop()
         self.current = 0
         self.action = Action.pagination
         self.refresh()
@@ -328,7 +348,7 @@ class Application(Tk, WorkflowStep):
         self.current = current
         self.action = Action.pagination_similarities
 
-        self.display_similarities( self.last_objs )
+        self.display_similarities( set(self.get_last_objs(self.current_pagination)) )
                 
     def show_albums(self, current=0):
         self.current = current
@@ -457,6 +477,14 @@ class Application(Tk, WorkflowStep):
     def previous_page(self):
         self.current -= 1
         self.refresh()
+        
+    def next_pagination(self):
+        self.current_pagination += 1
+        self.refresh()
+        
+    def previous_pagination(self):
+        self.current -= 1
+        self.current_pagination()
       
 #### End BottomPanel
 ## End Event Handling
@@ -489,16 +517,34 @@ class Application(Tk, WorkflowStep):
             files = self.parents_album[-1].deep_files()
         else:
             files = self.library.deep_files()
-        similarities = find_similarities(files, 0.65)
+        raw_similarities = find_similarities(files, 0.65)
+        print("RAw sim ", raw_similarities)
+        similarities0 = collections.defaultdict( set ) # on dit que ~s est transitive
+        for (f1,f2) in raw_similarities:
+            similarities0[ f1 ].add(f2)
+            similarities0[ f2 ].add(f1)
+            
+        #maintenant on recupere une seul classe déquivalence
+        similarities=[]
+        history = set()
+        
+        for f, twins in similarities0.items():
+            if not history.intersection( twins ) and not f in history:
+                history.add(f)
+                history.update(twins)
+                
+                twins.add( f )
+                similarities.append( twins )
         #print("Report similarities %d" % len(similarities))
         if similarities:
-            a, b =similarities[0]
-            set1 = set()
-            set1.add(a)
-            set1.add(b)
             self.current = 0
-            self.display_similarities(set1)
+            self.current_pagination = 0
+            self.last_objs=[[]]
+            for k,twins in enumerate(similarities):
+                self.set_last_objs(k, twins)
+            #self.display_similarities(similarities[0])
             self.action = Action.pagination_similarities
+            self.refresh()
 
 
     def set_sortname(self, name):

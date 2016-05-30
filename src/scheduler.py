@@ -388,7 +388,8 @@ class Scheduler(Container):
     
     #all method below are not thread safe
     def __str__(self):
-        return str(self.pgs)    
+        return str(self.pgs)  
+          
     def add_pg(self, pg):
         if self.passive:
             return super().add(pg)
@@ -434,7 +435,11 @@ class Scheduler(Container):
                 self.replicat = data["replicat"]
                 self.passive = data["passive"]
         else:
-            with open("pgs.json", "r") as f: #il faut preserver les ids sinon on ne retrouvera plus les fichiers
+            if sys.platform == 'win32' or sys.platform == 'cygwin':
+                "pgs-win.json"
+            else:
+                location = "pgs-lin.json"
+            with open(location, "r") as f: #il faut preserver les ids sinon on ne retrouvera plus les fichiers
                 config = json.load(open("pgs.json"))
 
                 global max_ratio#a modifier
@@ -452,11 +457,6 @@ class Scheduler(Container):
         if os.path.isfile("files.json"):
             with open("files.json", "r") as f :
                 self.files = json.load(f)
-        
-        #print(self.files)
-        #for pg in self.pgs:
-            #print(pg)
-        #raise Exception("")
         
     def store(self):
         with open("files.json", "w") as f :
