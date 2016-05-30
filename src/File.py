@@ -83,25 +83,6 @@ class File(Versionned):
         self.md5 = md5
         self.metadata = FileMetadata(self)      
         self.thumbnail = None
-                     
-        self.io_lock = threading.Lock() #pour gérer les export concurrant à une suppression si wait vérouiller on ne peut pas supprimer
-
-    def __deepcopy__(self, memo):
-        new = File(self.md5, self.filename)
-        new.thumbnail = self.thumbnail
-        new.metadata = self.metadata.__deepcopy__(None, new)
-        new.io_lock = self.io_lock
-        
-        return new
-    
-    def __getstate__(self):
-        tmp = copy.copy( self.__dict__ )
-        del tmp["io_lock"]
-        return tmp
-    
-    def __setstate__(self, state):
-        self.__dict__ = state
-        self.io_lock = threading.Lock()
     
     def extract(self, location): #called only the first time
         with open(location, "rb") as f:
@@ -117,12 +98,13 @@ class File(Versionned):
     def store(self, location): 
         scheduler.add_file( location, self.md5, self.metadata.size )
       
-    def export_to(self, location):
-        raise Exception("export_to not rewritte yet")
-        #if not os.path.isfile(location):
-            #flag = shutil.copy2( self.location, location) == location
+    def export_to(self, path):
+        location = os.path.join(path, self.filename)
+        
+        if not os.path.isfile(location):
+            with open(location, 'wb') as fp:
+                return shutil.copyfileobj( scheduler.get_file(self.md5), fp)
          
-    @io_protect() #la seule à devoir être proteger, du fait de la construction de l'application
     def remove(self):   
         if self.thumbnail:
             scheduler.remove_file( self.thumbnail )

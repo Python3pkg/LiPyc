@@ -401,24 +401,9 @@ class Application(Tk, WorkflowStep):
             return False
         self.io_threads.append( self.library.add_directory( location, self.rightPanel.actionPanel.set ) )
           
-    def _export_to(files, albums):
-        for _file in files:
-            _file.export_to(location)
-            _file.io_lock.release()
-            
-        for album in albums:
-            album.export_to(location)
-             
-        files = copy.deepcopy( [handler._file for handler in self.selected_files]  )
-        albums = copy.deepcopy( [handler.album for handler in self.selected_albums])
-        
-        for _file in files:
-            _file.io_lock.acquire()
+    
 
-        th = threading.Thread(None, _export_to, None, ( files, albums))
-        th.start()
-        self.io_threads.append(th)
-        
+
     def export_to(self):
         location = filedialog.askdirectory()
         if not location :
@@ -428,10 +413,18 @@ class Application(Tk, WorkflowStep):
             messagebox.showerror("Error", "No target specified")
             return False
         
-        if not self.selected_albums and not self.selected_files:
+        if not self.selected:
             messagebox.showerror("Error", "Nothing to export")
             return False
     
+        def _export_to(objs):
+            for obj in objs:
+                obj.export_to(location)
+
+        th = threading.Thread(None, _export_to, None, [copy.deepcopy( self.selected )])
+        th.start()
+        self.io_threads.append(th)
+        
     
 #### End Menu
      

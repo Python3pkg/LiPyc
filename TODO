@@ -4,8 +4,8 @@
 -> outil(s) de restauration pour scheduler
 -> chiffré les clés aes à l'aide d'un mdp au démarrage
 -> système de rapport(vers un serveur perso) : pour controler scheduler, usage cache
--> gui similarities
 -> face detection and recognition
+-> jobs number and progress bar
 
 attentino add_to et copy_to pareil pour un fichier
 

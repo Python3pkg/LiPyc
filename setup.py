@@ -2,12 +2,12 @@ from distutils.core import setup
 import os
 
 setup(name="LiPyc",
-        version="0.3.8.dev1",
+        version="0.3.9.dev1",
         description="",
         author="Laurent Prosperi",
         author_email="laurent.prosperi@ens-cachan.fr",
         url="https://github.com/severus21/LiPyc",
-        platforms="",
+        platforms=["linux", "win32", "cygwin"],
         license="Apache 2.0",
         download_url="https://pypi.python.org/pypi/LiPyc",
         classifiers=[
