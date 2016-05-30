@@ -502,7 +502,7 @@ class Scheduler(Container):
 scheduler=Scheduler()  #variable globale pour l'application jusqu'à ce que je troouve une meilleur idée (FUSE : Linux, Mac)
 scheduler.load()
 #print("===================================================")
-#test_files = ["file_default.png", "album_default.png", "pgs.json"]
+#test_files = [location_file_default, location_album_default, "pgs.json"]
 #for loc in test_files:
     #m = scheduler.add_file(loc)
     #tmp = scheduler.get_file( m )

@@ -91,7 +91,7 @@ class Album(Versionned): #subalbums not fully implemented
         if not isinstance(location, str) or check_ext(location, img_exts): #fichier ouvert
             self.thumbnail = make_thumbnail( location )
         else:
-            self.thumbnail = scheduler.add_file("album_default.png") #size and md5  ought to be combute once for all
+            self.thumbnail = scheduler.add_file(location_album_default) #size and md5  ought to be combute once for all
     
     def deep_files(self):
         tmp = itertools.chain.from_iterable(map(Album.deep_files, self.subalbums))

@@ -23,20 +23,25 @@ exts   = [ "png", "jpeg", "jpg", "mov", "mp4", "mpg", "thm", "3gp"]
 img_exts = [ "png", "jpeg", "jpg"]
 mv_exts = ["mov", "mp4", "mpg", "thm", "3gp"]
 
+from pkg_resources import resource_filename, resource_exists, Requirement
+
+location_album_default = resource_filename(Requirement.parse("lipyc"), "album_default.png")
+location_file_default = resource_filename(Requirement.parse("lipyc"), "file_default.png")
+location_pgs_default = resource_filename(Requirement.parse("lipyc"), "default-pgs.json")
 
 BUFFER_SIZE = 1<<21
 
-hashlib.md5(open("album_default.png", "rb").read()).hexdigest()
+hashlib.md5(open(location_album_default, "rb").read()).hexdigest()
 
 thumbnails={
     "album":{
-        "fp":"album_default.png", 
-        "md5": hashlib.md5(open("album_default.png", "rb").read()).hexdigest(),
-        "size":os.path.getsize("album_default.png")},
+        "fp":location_album_default, 
+        "md5": hashlib.md5(open(location_album_default, "rb").read()).hexdigest(),
+        "size":os.path.getsize(location_album_default)},
     "file":{
-        "fp":"file_default.png", 
-        "md5":hashlib.md5(open("file_default.png", "rb").read()).hexdigest(), 
-        "size":os.path.getsize("file_default.png")}
+        "fp":location_file_default, 
+        "md5":hashlib.md5(open(location_file_default, "rb").read()).hexdigest(), 
+        "size":os.path.getsize(location_file_default)}
 }
 
 

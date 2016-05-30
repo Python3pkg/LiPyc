@@ -416,7 +416,7 @@ class SchedulerPanel(Panel):
         if os.path.isfile("pgs.json"):
             location = "pgs.json"
         else:
-            location = "default-pgs.json"
+            location = location_pgs_default
             
         with open(location, "r") as fp:    
             self.textarea.insert(END, fp.read())      

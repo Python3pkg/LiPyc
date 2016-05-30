@@ -93,7 +93,7 @@ class File(Versionned):
         if check_ext(self.filename, img_exts):
             self.thumbnail = make_thumbnail( location )
         else:
-            self.thumbnail = scheduler.add_file( "file_default.png" )#md5 and size can be compute before...once for the whole application
+            self.thumbnail = scheduler.add_file( location_file_default )#md5 and size can be compute before...once for the whole application
                    
     def store(self, location): 
         scheduler.add_file( location, self.md5, self.metadata.size )

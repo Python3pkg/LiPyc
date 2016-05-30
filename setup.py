@@ -1,9 +1,9 @@
 from distutils.core import setup
 import os
 
-setup(name="LiPyc",
+setup(name="lipyc",
         version="0.3.10.dev1",
-        description="",
+        description="a light picture manager",
         author="Laurent Prosperi",
         author_email="laurent.prosperi@ens-cachan.fr",
         url="https://github.com/severus21/LiPyc",
@@ -22,11 +22,13 @@ setup(name="LiPyc",
             'Programming Language :: Python :: 3.5',
             'Programming Language :: Python :: 3.6'
         ],
-        packages=["lipyc", "lipyc.panels", "lipyc.style"],
+        packages=["lipyc", "lipyc.panels"],
+        scripts = ['launcher.py'],
         keywords= ["picture", "managment"],
         package_dir = {"lipyc": "src"},
         requires=["PIL", "tkinter", "pycrypto", "cv2"],
-        data_files=[
-            ("", ["album_default.png", "file_default.png"]),
-        ]
+        package_data={
+            "lipyc": ["album_default.png", "file_default.png", "default-pgs.json"],
+        },
+        include_package_data = True
     )
