@@ -31,6 +31,7 @@ class TopMenu(Menu):
         self.make_import()
         self.make_export()
         self.make_functions()
+        self.make_preferences()
 
     def make_file(self):
         m_file = Menu(self, tearoff=0)
@@ -50,6 +51,12 @@ class TopMenu(Menu):
         m_export.add_command(label="Export to", command= self.app.export_to)
         #m_export.add_command(label="Export lib to", command= self.app.export_lib_to)
         self.add_cascade(label="Export", menu=m_export)
+
+    def make_preferences(self):
+        m_preferences = Menu(self, tearoff=0)
+        m_preferences.add_command(label="Scheduler", command= self.app.configure_pgs)
+        
+        self.add_cascade(label="Preferences", menu=m_preferences)
 
     def make_functions(self):
         m_func = Menu(self, tearoff=0)

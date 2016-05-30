@@ -12,6 +12,7 @@ import tempfile
 import pickle
 import threading
 import collections
+import sys
 
 from random import random
 
@@ -426,6 +427,25 @@ class Scheduler(Container):
                 n_pg.place(key).write( md5, size, make_path(bucket.path, md5) )
             bucket.remove( md5, size )
         
+    def parse(self):
+        if not os.path.isfile("pgs.json"):
+            return False
+            
+        with open("pgs.json", "r") as fp: #il faut preserver les ids sinon on ne retrouvera plus les fichiers
+            config = json.load(fp)
+
+            global max_ratio#a modifier
+            max_ratio = config["max_ratio"]
+            self.replicat = config["replicat"]
+            aeskey = config["aeskey"] if "aeskey" in config else ""
+
+            assert( len(config["pgs"]) == len(config["pgs"].keys()))
+
+            pgs=list(config["pgs"].items())
+            for name, json_pg in pgs:
+                tmp = PG.make(name, json_pg, aeskey)
+                self.add( tmp )
+    
     def load(self):
         if os.path.isfile("scheduler.data"):
             with open( "scheduler.data", 'rb') as f:
@@ -435,24 +455,7 @@ class Scheduler(Container):
                 self.replicat = data["replicat"]
                 self.passive = data["passive"]
         else:
-            if sys.platform == 'win32' or sys.platform == 'cygwin':
-                "pgs-win.json"
-            else:
-                location = "pgs-lin.json"
-            with open(location, "r") as f: #il faut preserver les ids sinon on ne retrouvera plus les fichiers
-                config = json.load(open("pgs.json"))
-
-                global max_ratio#a modifier
-                max_ratio = config["max_ratio"]
-                self.replicat = config["replicat"]
-                aeskey = config["aeskey"] if "aeskey" in config else ""
-
-                assert( len(config["pgs"]) == len(config["pgs"].keys()))
-
-                pgs=list(config["pgs"].items())
-                for name, json_pg in pgs:
-                    tmp = PG.make(name, json_pg, aeskey)
-                    self.add( tmp )
+            self.parse()
         
         if os.path.isfile("files.json"):
             with open("files.json", "r") as f :

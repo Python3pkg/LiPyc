@@ -2,7 +2,7 @@ from distutils.core import setup
 import os
 
 setup(name="LiPyc",
-        version="0.3.9.dev1",
+        version="0.3.10.dev1",
         description="",
         author="Laurent Prosperi",
         author_email="laurent.prosperi@ens-cachan.fr",
@@ -22,7 +22,7 @@ setup(name="LiPyc",
             'Programming Language :: Python :: 3.5',
             'Programming Language :: Python :: 3.6'
         ],
-        packages=["lipyc", "lipyc.panels"],
+        packages=["lipyc", "lipyc.panels", "lipyc.style"],
         keywords= ["picture", "managment"],
         package_dir = {"lipyc": "src"},
         requires=["PIL", "tkinter", "pycrypto", "cv2"],

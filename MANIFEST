@@ -13,6 +13,7 @@ src/autologin.py
 src/config.py
 src/crypto.py
 src/scheduler.py
+src/similarity.py
 src/utility.py
 src/panels/LeftPanel.py
 src/panels/MainPanel.py

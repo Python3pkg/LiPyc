@@ -1,5 +1,5 @@
 from tkinter import * 
-from tkinter import ttk
+from tkinter.ttk import *
 from tkinter import filedialog
 from tkinter import messagebox
 
@@ -41,6 +41,7 @@ from lipyc.config import *
 from lipyc.autologin import *
 from lipyc.scheduler import scheduler
 from lipyc.similarity import find_similarities
+
 #class Certificat(Enum):
     #add_album = 0
 
@@ -256,9 +257,9 @@ class Application(Tk, WorkflowStep):
         self.leftPanel.set_pagination(albums)
         self.rightPanel.set_pagination(self.selected)
         
-        self.mainPanel.show()
-        self.leftPanel.show()
-        self.rightPanel.show()
+        self.leftPanel.grid(row=0, column=0)
+        self.mainPanel.grid(row=0, column=1)
+        self.rightPanel.grid(row=0, column=2)
         
     def display_files(self, files):
         self.action = Action.pagination_files
@@ -270,9 +271,9 @@ class Application(Tk, WorkflowStep):
         self.leftPanel.set_pagination(files)
         self.rightPanel.set_pagination(self.selected)
         
-        self.mainPanel.show()
-        self.leftPanel.show()
-        self.rightPanel.show()
+        self.leftPanel.grid(row=0, column=0)
+        self.mainPanel.grid(row=0, column=1)
+        self.rightPanel.grid(row=0, column=2)
     
     def display_similarities(self, similarities):
         self.action = Action.pagination_similarities
@@ -284,9 +285,9 @@ class Application(Tk, WorkflowStep):
         self.leftPanel.set_pagination(similarities)
         self.rightPanel.set_pagination(similarities)
         
-        self.mainPanel.show()
-        self.leftPanel.show()
-        self.rightPanel.show()
+        self.leftPanel.grid(row=0, column=0)
+        self.mainPanel.grid(row=0, column=1)
+        self.rightPanel.grid(row=0, column=2)
         
         
     def display_file(self, _file, k):#position de files in self.last_objs
@@ -296,10 +297,10 @@ class Application(Tk, WorkflowStep):
         self.mainPanel.set_display(_file)
         self.leftPanel.set_display(_file)
         self.rightPanel.set_display(_file)
-        
-        self.mainPanel.show()
-        self.leftPanel.show()
-        self.rightPanel.show()
+       
+        self.leftPanel.grid(row=0, column=0)
+        self.mainPanel.grid(row=0, column=1)
+        self.rightPanel.grid(row=0, column=2)
     
     def display_previous(self):
         if self.last_k>-1:
@@ -349,7 +350,11 @@ class Application(Tk, WorkflowStep):
         self.action = Action.pagination_similarities
 
         self.display_similarities( set(self.get_last_objs(self.current_pagination)) )
-                
+          
+    def show_library(self):
+        self.action = Action.pagination
+        self.refresh()
+            
     def show_albums(self, current=0):
         self.current = current
         self.action = Action.pagination_albums
@@ -560,7 +565,9 @@ class Application(Tk, WorkflowStep):
             self.show_similarities(self.current)
         elif self.action == Action.display_file:
             pass
-        
+        elif self.action == Action.configure_pgs:
+            pass
+            
     def refresh(self, auto=False):
         s = default_timer()
         if not auto :
@@ -597,3 +604,19 @@ class Application(Tk, WorkflowStep):
                 self.remove_file(obj)
                 
         self.refresh()
+
+
+    def configure_pgs(self):
+        self.action = Action.configure_pgs
+        
+        self.rightPanel.hide()
+        self.leftPanel.hide()
+        
+        self.mainPanel.set_scheduler()
+        self.mainPanel.grid(row=0, column=1)
+        
+    def save_pgs(self, data):
+        with open("pgs.json", "w") as fp:
+            fp.write(data)
+            
+        scheduler.parse()

@@ -2,6 +2,7 @@ from tkinter import *
 from tkinter import ttk
 from tkinter import filedialog
 from tkinter import messagebox
+from tkinter.scrolledtext import ScrolledText
 
 from PIL import Image
 from PIL import ImageTk# https://pillow.readthedocs.io/en/3.2.x/   libjpeg-dev sudo pip3 install pillow  sudo apt-get install libjpeg8-dev python3-pil.imagetk
@@ -59,17 +60,17 @@ class TopPanel(Panel):
         self.last_action = ""
         self.last_parents = 0
         self.last_k = -1
+
+        
         for k in range(max_buttons):
-            tmp = Frame(self)
-            tmp.button = Button(tmp)
+            tmp = ttk.Frame(self)
+            tmp.button = ttk.Button(tmp)
             tmp.widget = None
             tmp.button.pack(side=RIGHT)
             
             tmp.grid(row=k, column=max_buttons)
             tmp.grid_forget()
-            
-
-            
+                        
             self.buttons.append(tmp)
         
         self.current_pagination = -1
@@ -386,52 +387,40 @@ class PaginationPanel(VScrolledPanel):
         
         self.last_len = min( len(objs), len(self.tiles))
 
-#class SchedulerPanel(VScrolledPanel): not needed already pgs.json 
-    #def __init__(self, app, master, *args, **kwargs):
-        #super().__init__(master, bg="white", *args, **kwargs)
-        #self.canvas.configure(height=480)
+class SchedulerPanel(Panel):
+    def __init__(self, app, master, *args, **kwargs):
+        super().__init__(master, bg="white", *args, **kwargs)
         
-        #self.app = app
+        self.app = app
         
-        #self.pg_frames = []
-         
-    #def refresh(self):
-        #pass
+        self.textarea = ScrolledText(self)
+        self.textarea.pack()
+        
+        self.b_frame = Frame(self)
+        self.b_frame.pack()
+        
+        self.b_save = Button(self.b_frame, text="Save", command=lambda _=None:self.app.save_pgs(self.textarea.get("1.0",END)))
+        self.b_save.pack(side=LEFT)
+        self.b_leave = Button(self.b_frame, text="Leave", command=self.app.show_library)
+        self.b_leave.pack(side=LEFT)
+    
+    def refresh(self):
+        pass
             
-    #def make_bucket(self, bucket, frame):
-        #pass
-        
-    #def make_container(self, container, parent, frame):
-        #name=StringVar()
-        #name.set( container.name )
-        #name_e = Entry(frame, textvariable=name, width=15)
-        #name_e.pack()
-        
-        #b_rename = Button(self.pg_frames[-1], text="Rename", command=lambda _=None:container.set_name( name.get()))
-        #b_rename.pack()
-        #b_remove = Button(self.pg_frames[-1], text="Delete", command=lambda _=None:parent.remove(container))
-        #b_remove.pack()
-        
-        #aeskey=StringVar()
-        #aeskey.set( container.aeskey )
-        #aeskey_e = Entry(frame, textvariable=aeskey, width=15)
-        #aeskey_e.pack()
-        #b_aeskey = Button(frame, text="Change key", command=lambda _=None:container.set_aeskey(aeskey.get()) )
-        #b_aeskey.pack()
-        
-        #f_children = Frame(frame)
-        #f_children.pack()
-        #for child in container.children:
-            #if isinstance(child, Bucket):
-                #self.make_bucket(chikd, container, f_children)
-            #else:
-                #self.make_container(child, container, f_children)
+    def reset(self):
+        pass
             
-    #def set(self, objs):        
-        #for pg in scheduler.pgs:
-            #self.pg_frames.append( Frame(self) )
-            #self.pg_frames[-1].pack() 
-            #self.make_container(pg, scheduler, self.pg_frames[-1])
+    def set(self):  
+        self.textarea.delete("1.0", END)
+
+        if os.path.isfile("pgs.json"):
+            location = "pgs.json"
+        else:
+            location = "default-pgs.json"
+            
+        with open(location, "r") as fp:    
+            self.textarea.insert(END, fp.read())      
+        
 
 class DisplayPanel(Panel):
     def __init__(self, app, master, *args, **kwargs):
@@ -497,7 +486,8 @@ class MainPanel(Panel):
         
         self.centers = {
             "pagination" : PaginationPanel(app, self, num_x, num_y, height=500),
-            "display" : DisplayPanel(app, self)
+            "display" : DisplayPanel(app, self),
+            "scheduler": SchedulerPanel(app, self)
         }
         
         for panel in self.centers.values() :
@@ -514,12 +504,12 @@ class MainPanel(Panel):
         if self.centerPanel != self.centers["pagination"]:
             self.centerPanel.hide()
         
+        self.topPanel.set_pagination()
+        self.topPanel.show()
+        
         self.centerPanel = self.centers["pagination"]
         self.centerPanel.set(objs)
         self.centerPanel.show()
-        
-        self.topPanel.set_pagination()
-        self.topPanel.show()
         
         self.bottomPanel.set_pagination(len(objs))
         self.bottomPanel.show()
@@ -528,29 +518,39 @@ class MainPanel(Panel):
         if self.centerPanel != self.centers["display"]:
             self.centerPanel.hide()
             
+        self.topPanel.set_display()
+        self.topPanel.show()
+            
         self.centerPanel = self.centers["display"]
         self.centerPanel.set(obj)
         self.centerPanel.show()
         
-        self.topPanel.set_display()
-        self.topPanel.show()
-        
         self.bottomPanel.hide()
     
-    def set_similarities(self, objs):        
-        self.bottomPanel.set_pagination(len(objs))
-        
+    def set_similarities(self, objs):                
         if self.centerPanel != self.centers["pagination"]:
             self.centerPanel.hide()
+        
+        self.topPanel.set_similarities(len(self.app.last_objs))
+        self.topPanel.show()
         
         self.centerPanel = self.centers["pagination"]
         self.centerPanel.set(objs)
         self.centerPanel.show()
         
-        self.topPanel.set_similarities(len(self.app.last_objs))
-        self.topPanel.show()
-        
+        self.bottomPanel.set_pagination(len(objs))
         self.bottomPanel.show()
+      
+    def set_scheduler(self):
+        self.bottomPanel.hide()
+        self.topPanel.hide()
+        
+        if self.centerPanel != self.centers["scheduler"]:
+            self.centerPanel.hide()
+        
+        self.centerPanel = self.centers["scheduler"]
+        self.centerPanel.set()
+        self.centerPanel.show()
         
     def refresh(self):
         self.centerPanel.refresh()

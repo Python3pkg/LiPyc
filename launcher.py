@@ -8,6 +8,8 @@ from lipyc.File import File, FileMetadata
 import sys
 import logging
 
+#from lipyc.style.default import s
+
 sys.setrecursionlimit(500)
 
 #logging.basicConfig(
@@ -18,6 +20,6 @@ logging.basicConfig(
         stream= sys.stdout,
         format='%(message)s',
         level=logging.INFO)
-
 app = Application()
+app.title("LiPyc")
 app.mainloop()
