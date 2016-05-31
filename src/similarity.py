@@ -16,7 +16,15 @@ def find_similarities(files, threshold=0.95):#O(n² moche, on peut faire de l'ex
                 hist1 = cv2.calcHist([img1], [0], None, [256], [0,256])
                 hist2 = cv2.calcHist([img2], [0], None, [256], [0,256])
                 
-                if cv2.compareHist(hist1, hist2, 0) > threshold and cv2.matchTemplate(img1, img2, 0) > threshold:
+                h1, w1 = img1.shape
+                h2, w2 = img2.shape
+                
+                if h2<=h1 and w2<=w1:
+                    template_flag = cv2.matchTemplate(img1, img2, 0) > threshold
+                else:
+                    template_flag = True
+                
+                if cv2.compareHist(hist1, hist2, 0) > threshold and template_flag:
                     similarities.append( (file1,file2) )
 
     return similarities

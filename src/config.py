@@ -23,11 +23,11 @@ exts   = [ "png", "jpeg", "jpg", "mov", "mp4", "mpg", "thm", "3gp"]
 img_exts = [ "png", "jpeg", "jpg"]
 mv_exts = ["mov", "mp4", "mpg", "thm", "3gp"]
 
-from pkg_resources import resource_filename, resource_exists, Requirement
+from pkg_resources import resource_filename, resource_exists
 
-location_album_default = resource_filename(Requirement.parse("lipyc"), "album_default.png")
-location_file_default = resource_filename(Requirement.parse("lipyc"), "file_default.png")
-location_pgs_default = resource_filename(Requirement.parse("lipyc"), "default-pgs.json")
+location_album_default = resource_filename("lipyc.data", "album_default.png")
+location_file_default = resource_filename("lipyc.data", "file_default.png")
+location_pgs_default = resource_filename("lipyc.data", "default-pgs.json")
 
 BUFFER_SIZE = 1<<21
 

@@ -140,58 +140,68 @@ class Application(Tk, WorkflowStep):
             self.io_threads.append(t)
 
     def register_events(self):
-        def _keypress_event(event):
-            if event.keycode == 37 or event.keycode == 105: #ctrl
-                self.selected_mod = True
-        
-        def _keyrelease_event(event): 
-            if event.keycode == 37 or event.keycode == 105: #ctrl
-                self.selected_mod = False
-            elif event.keycode == 119:#supr
-                self.remove( self.selected )
-            elif event.keycode == 114:#=>
-                if self.action == Action.display_file:
-                    self.display_next()
-                elif self.action in [Action.pagination, Action.pagination_albums, Action.pagination_files, Action.pagination_similarities]:
-                    self.select_next()
-            elif event.keycode == 113:#=>
-                if self.action == Action.display_file:
-                    self.display_previous()
-                elif self.action in [Action.pagination, Action.pagination_albums, Action.pagination_files, Action.pagination_similarities]:
-                    self.select_previous()
-            elif event.keycode == 111:#up 
-                if self.action in [Action.pagination, Action.pagination_albums, Action.pagination_files, Action.pagination_similarities]:
-                    self.select_up()
-            elif event.keycode == 116:#down
-                if self.action in [Action.pagination, Action.pagination_albums, Action.pagination_files, Action.pagination_similarities]:
-                    self.select_down()
-            elif event.keycode == 36 or event.keycode == 104:#Enter
-                if len(self.selected) == 1:
-                    tmp = self.selected.pop()
-                    self.selected.add( tmp )
-                    
-                    if isinstance(tmp, File):
-                        self.parents_album.append(self.parents_album[-1])
-                        self.display_file(tmp, self.last_k)
-                    else:
-                        self.action = Action.pagination
-                        self.parents_album.append( tmp )
-
-                    self.refresh()
-                        
-
         def escape(e):
             if self.parents_album :
                 self.back()
-        self.bind("<Escape>", escape)
-        self.bind("<KeyPress>", _keypress_event)
-        self.bind("<KeyRelease>", _keyrelease_event)
+      
+        def enter(e):
+            if len(self.selected) == 1:
+                tmp = self.selected.pop()
+                self.selected.add( tmp )
+                
+                if isinstance(tmp, File):
+                    self.parents_album.append(self.parents_album[-1])
+                    self.display_file(tmp, self.last_k)
+                else:
+                    self.action = Action.pagination
+                    self.parents_album.append( tmp )
+
+                self.refresh()
         
-        #def _on_mousewheel(e):
-            #print(type(e.widget))
-        #self.bind("<MouseWheel>", _on_mousewheel)
-        #self.bind("<Button-4>", _on_mousewheel)
-        #self.bind("<Button-5>", _on_mousewheel)
+        def delete(e):
+            self.remove( self.selected )
+        
+        def up(e):
+            if self.action in [Action.pagination, Action.pagination_albums, Action.pagination_files, Action.pagination_similarities]:
+                self.select_up()
+        
+        def down(e):
+            if self.action in [Action.pagination, Action.pagination_albums, Action.pagination_files, Action.pagination_similarities]:
+                self.select_down()
+        
+        def left(e):
+            if self.action == Action.display_file:
+                self.display_previous()
+            elif self.action in [Action.pagination, Action.pagination_albums, Action.pagination_files, Action.pagination_similarities]:
+                self.select_previous()
+        
+        def right(e):
+            if self.action == Action.display_file:
+                self.display_next()
+            elif self.action in [Action.pagination, Action.pagination_albums, Action.pagination_files, Action.pagination_similarities]:
+                self.select_next()
+        
+        def control_press(e):
+            self.selected_mod = True
+            
+        def control_release(e):
+            self.selected_mod = False
+            
+        self.bind("<Escape>", escape)
+        self.bind("<Return>", enter)
+        self.bind("<Delete>", delete)
+        
+        self.bind("<KeyPress-Control_L>", control_press)
+        self.bind("<KeyPress-Control_R>", control_press)
+        self.bind("<KeyRelease-Control_L>", control_release)
+        self.bind("<KeyRelease-Control_R>", control_release)
+        
+        self.bind("<Up>", up)
+        self.bind("<Down>", down)
+        self.bind("<Left>", left)
+        self.bind("<Right>", right)
+        #http://infohost.nmt.edu/tcc/help/pubs/tkinter/web/key-names.html
+        #https://stackoverflow.com/questions/16082243/how-to-bind-ctrl-in-python-tkinter
         
     def register_ticks(self):
         def _save():
@@ -235,13 +245,12 @@ class Application(Tk, WorkflowStep):
             self.select( self.get_last_objs(self.current_pagination)[i], i)
 
     def get_last_objs(self, id_pagination):
-        print(len(self.last_objs), id_pagination)
         return self.last_objs[id_pagination]
     
     def set_last_objs(self, id_pagination, objs):
         for k in range(len(self.last_objs), max(len(self.last_objs), id_pagination+1)):
             self.last_objs.append( [] )
-        print(len(self.last_objs), id_pagination)
+
         self.last_objs[id_pagination] = list(objs)
         
 
@@ -280,7 +289,7 @@ class Application(Tk, WorkflowStep):
         
         self.set_last_objs(self.current_pagination, similarities)
         #self.last_objs = similarities
-        print( similarities)
+
         self.mainPanel.set_similarities(similarities)
         self.leftPanel.set_pagination(similarities)
         self.rightPanel.set_pagination(similarities)
@@ -516,7 +525,7 @@ class Application(Tk, WorkflowStep):
         else:
             files = self.library.deep_files()
         raw_similarities = find_similarities(files, 0.65)
-        print("RAw sim ", raw_similarities)
+
         similarities0 = collections.defaultdict( set ) # on dit que ~s est transitive
         for (f1,f2) in raw_similarities:
             similarities0[ f1 ].add(f2)
