@@ -10,7 +10,7 @@ import logging
 import shutil
 import tempfile
 import pickle
-import threading
+from threading import Lock, Condition
 import collections
 import sys
 
@@ -24,37 +24,16 @@ def wrand(seed, value):
 def make_path(path, md5):
     return os.path.join( path, "%s" % md5) 
 
-def counter(cls):
-    id_name = "_%s__id" % cls.__name__
-    if id_name in cls.__dict__:
-        return cls
+def lock_protection(method):
+    def warper(self, *args, **kwargs):
+        r = None
+        with self.lock:
+            r=method(self, *args, **kwargs)
+
+        return r
     
-    cls.__id = 0
-
-    def _warpe(method):
-        def _warper(self, *args, **kwargs):
-            cls.__id +=1
-            self._id = cls.__id
-
-            method(self, *args, **kwargs)
-        return _warper
-            
-    setattr(cls, "__init__", _warpe(cls.__init__))
-
-    if hasattr(cls, "__copy__"):
-        setattr(cls, "__copy__", _warpe(cls.__copy__))
-    else:
-        def _copy(self):
-            newone = type(self)()
-            nid = newone._id
-            newone.__dict__.update(self.__dict__)
-            newone._id = nid
-            return newone
-        setattr(cls, "__copy__", lambda self:_copy(self))
-    setattr(cls, "__get_id__", lambda _=None: cls._id)
-
-    return cls
-
+    return warper
+    
 def sizeof_fmt(num, suffix='B'):
     for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
         if abs(num) < 1024.0:
@@ -62,12 +41,15 @@ def sizeof_fmt(num, suffix='B'):
         num /= 1024.0
     return "%.1f%s%s" % (num, 'Yi', suffix)
 
+def generate_id(name):
+    return int( hashlib.md5(name.encode('utf-8')).hexdigest(), 16)
+
 #speed use only to select : read replicat
 #nom => identifiant unique pour l'utilisateur(au sein d'un mêm parent)
 max_ratio = 100 #on ne peut multiplier la proba que par 5 au plus
 class Container:
     def __init__(self, name=""):
-        self.name = name
+        self._name = name
         self.free_capacity = 0
         self.max_capacity = 0
         self.speed = 1.
@@ -75,24 +57,37 @@ class Container:
         self.children = set()
         
         self._min_obj = None
-        
+        self.lock = Lock()
+
+        self._id = generate_id(name)
+
+     
+    @property
+    def name(self):
+        return self._name
+    
+    @name.setter
+    def name(self, _name):
+        self._id = generate_id(_name)
+        self._name = _name
+  
     def add(self, obj, disjoint=False):
         self.max_capacity += obj.max_capacity
         self.free_capacity += obj.free_capacity
         self.speed += obj.speed if disjoint else 0
         
-        self.add_(obj)
+        self._add(obj)
         assert(self.free_capacity >= 0)
-                    
+      
     def remove(self, obj, disjoint=False):
         self.max_capacity -= obj.max_capacity
-        self.free_capacity += (obj.max_capacity - obj.free_capacity)
+        self.free_capacity -= obj.free_capacity
         self.speed -= obj.speed if disjoint else 0
         
         self.children.discard(obj)
         assert(self.free_capacity <= self.max_capacity)
-    
-    def add_(self, obj):#construction n^2....
+   
+    def _add(self, obj):#construction n^2....
         if not self.children:
             self.children.add( obj )
             return 
@@ -112,14 +107,45 @@ class Container:
             tmp.free_capacity /= r
             
             self.children.add( tmp )
-                
+        
+    def update_stats(self):
+        self.free_capacity = 0
+        for child in self.children:
+            self.free_capacity += child.free_capacity
+          
+    def __eq__(self, other):
+        return self.name == other.name
+      
+    def __hash__(self):
+        return hash(self.name)
+
     def __str__(self, ident=' '):
-        buff="%sContainer %d: %s, %d/%d : %f\n" % (ident, self._id,self.name, self.free_capacity, self.max_capacity, float(self.free_capacity)/(float(self.max_capacity)))
+        buff="%sContainer: %s, %d/%d : %f\n" % (ident,self.name, self.free_capacity, self.max_capacity, float(self.free_capacity)/(float(self.max_capacity+1)))
         for child in self.children:
             buff+=child.__str__(ident*2)
         return buff
     
-@counter        
+    def __getstate__(self):
+        return {
+            '_id':self._id,
+            'name':self.name,
+            'free_capacity':self.free_capacity,
+            'max_capacity':self.max_capacity,
+            'speed':self.speed,
+            'children':self.children,
+            '_min_obj':self._min_obj,
+        }
+    
+    def __setstate__(self, state):
+        self._id = state['_id']
+        self.name = state['name']
+        self.free_capacity = state['free_capacity']
+        self.max_capacity = state['max_capacity']
+        self.speed = state['speed']
+        self.children = state['children']
+        self._min_obj = state['_min_obj']
+        self.lock=Lock()
+             
 class Bucket: #décrit un dossier ex: photo, gdrive, dropbox
     def make(name, json_bucket, aeskey):
         return Bucket(path=json_bucket["path"], 
@@ -130,7 +156,7 @@ class Bucket: #décrit un dossier ex: photo, gdrive, dropbox
             aeskey=json_bucket["aeskey"] if "aeskey" in json_bucket else aeskey)
             
     def __init__(self, max_capacity=0, path="", speed=1.0, name="", crypt=False, aeskey=""):
-        self.name = name
+        self._name = name
         self.crypt = crypt
         self.aeskey = aeskey
         
@@ -138,12 +164,24 @@ class Bucket: #décrit un dossier ex: photo, gdrive, dropbox
         self.max_capacity = max_capacity
         self.speed = speed
         self.path = path
-            
+        
+        self.lock = Lock()
+        self._id =  generate_id(name)
+    @property
+    def name(self):
+        return self._name
+       
+    @name.setter
+    def name(self, _name):
+        self._id = generate_id(_name)
+        self._name = _name
+        
     def write(self, md5, size, fp):
-        self.free_capacity -= size
-        if self.crypt :
-            self.free_capacity -= 2*lipyc.crypto.BS
-        assert(self.free_capacity >= 0)
+        with self.lock:
+            self.free_capacity -= size
+            if self.crypt :
+                self.free_capacity -= 2*lipyc.crypto.BS
+            assert(self.free_capacity >= 0)
         
         last = fp.tell()
         fp.seek(0)
@@ -159,29 +197,64 @@ class Bucket: #décrit un dossier ex: photo, gdrive, dropbox
         fp.seek(last)
     
     def remove(self, md5, size):
-        self.free_capacity += size        
-        assert(self.free_capacity <= self.max_capacity)
+        with self.lock:
+            self.free_capacity += size        
+            assert(self.free_capacity <= self.max_capacity)
         os.remove( make_path(self.path, md5) )
+    
+    def __eq__(self, other):
+        return self.name == other.name
+    
+    def __hash__(self):
+        return hash(self.name)
+    
     def __str__(self, ident=' '):
-        buff="%sBucket %d: %s, %d/%d : %f\n" % (ident, self._id, self.name, self.free_capacity, self.max_capacity, float(self.free_capacity)/(float(self.max_capacity)))
+        buff="%sBucket: %s, %d/%d : %f\n" % (ident, self.name, self.free_capacity, self.max_capacity, float(self.free_capacity)/(float(self.max_capacity+1)))
 
         return buff
+        
+    def __getstate__(self):
+        return {
+            '_id':self._id,
+            'name':self.name,
+            'crypt':self.crypt,
+            'aeskey':self.aeskey,
+            'free_capacity':self.free_capacity,
+            'max_capacity':self.max_capacity,
+            'speed':self.speed,
+            'path':self.path,
+        }
+        
+    def __setstate__(self, state):
+        self._id = state['_id']
+        self.name = state['name']
+        self.crypt = state['crypt']
+        self.aeskey = state['aeskey']
+        self.free_capacity = state['free_capacity']
+        self.max_capacity = state['max_capacity']
+        self.speed = state['speed']
+        self.path = state['path']
+        self.lock=Lock()
 
-@counter
 class Pool(Container):  #on décrit un disque par exemple avec pool
     def make(name, json_pool, aeskey):#config json to pool
         pool = Pool(name)
         aeskey = json_pool["aeskey"] if "aeskey" in json_pool else ""
         
-        for name, json_pool in json_pool["buckets"].items():
-            pool.add( Bucket.make(name, json_pool, aeskey) )
+        for _name, json_pool in json_pool["buckets"].items():
+            pool.add( Bucket.make(name+"|"+_name, json_pool, aeskey) )
         
         return pool
     
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    
+    @lock_protection
     def access(self, key):
         return min( self.children, 
             key = lambda obj:wrand( obj._id, key)) 
-            
+           
+    @lock_protection
     def place(self, key, size):
         self.free_capacity -= size 
 
@@ -192,24 +265,26 @@ class Pool(Container):  #on décrit un disque par exemple avec pool
         if bucket.free_capacity < size:
             logging.error("Cannot save file, no more space available in %s" % self)
             raise Exception("No More Space")
-            #en fait il faudrait passer le bucket en passive mod et trouver un algo qui cmarche pour le placement
-            self.rebalance() 
-                
+                    
         return bucket
-    
+   
+    @lock_protection
     def buckets(self):
         return itertools.chain( self.children )
 
-@counter
 class PG(Container):
     def make(name, json_pg, aeskey):#config json to pg
         pg = PG(name)
         aeskey = json_pg["aeskey"] if "aeskey" in json_pg else ""
-        for name, json_pool in json_pg["pools"].items():
-            pg.add( Pool.make(name, json_pool, aeskey) )
+        for _name, json_pool in json_pg["pools"].items():
+            pg.add( Pool.make(name+"|"+_name, json_pool, aeskey) )
         
         return pg
     
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    
+    @lock_protection
     def place(self, key, size):
         self.free_capacity -= size 
         
@@ -229,15 +304,23 @@ class PG(Container):
                 
         return bucket
     
+    @lock_protection
     def access(self, key):
         child = min( self.children, 
             key = lambda obj:wrand( obj._id, key))
         
         return child.access( key )
-        
+      
+    @lock_protection
     def buckets(self):
         return itertools.chain( map( Pool.children, self.children ))
-        
+    
+    @lock_protection
+    def prune(self):
+        for child in self.children:
+            if not child.children:
+                self.remove(child)
+
 class Scheduler(Container):
     def __init__(self, replicat=2):
         super().__init__()
@@ -248,11 +331,15 @@ class Scheduler(Container):
         self.passive = True #no data yet
         self.files = {} #ensemble des fichiers gérés : md5 => size, number(nombre de creation)
         
-        self.db_lock = threading.Lock()
+        self.db_lock = Lock()
         self.locks = {}#md5=>num_read,write_lock
         
-        
-    
+    def prune(self):
+        with self.db_lock:
+            for pg in self.pgs :
+                if not pg.children:
+                    self.remove(pg)
+  
     def place_(self, key):
         pgs = sorted(self.pgs, key = lambda obj:wrand( obj._id, key))
         return [pg for _,pg in zip( range(self.replicat), pgs) ]
@@ -277,7 +364,6 @@ class Scheduler(Container):
                 return bucket
         
         return buckets[-1] 
-    
         
     def add_file(self, fp, md5=None, size=None ): #current location of the file, fp location or file descriptor
         self.passive = False
@@ -298,8 +384,8 @@ class Scheduler(Container):
             
         with self.db_lock: #thread protection
             if not md5 in self.locks:
-                self.locks[md5]= {"read":0, "write":threading.Lock()}
-            condition = threading.Condition(self.locks[md5]["write"])
+                self.locks[md5]= {"read":0, "write":Lock()}
+            condition = Condition(self.locks[md5]["write"])
         
         with condition:
             condition.wait_for(lambda _=None: self.locks[md5]["read"]==0 )    
@@ -313,16 +399,13 @@ class Scheduler(Container):
                 self.files[md5] = [size,1]
             else:
                 self.files[md5][1] += 1
-            for pg in self.pgs:
-                print(pg)
                 
-            #raise Exception("")
             return md5
             
     def __contains__(self, md5):
         with self.db_lock:
             if not md5 in self.locks:
-                self.locks[md5]= {"read":0, "write":threading.Lock()}
+                self.locks[md5]= {"read":0, "write":Lock()}
                 
         with self.locks[md5]["write"]:
             return md5 in self.files
@@ -330,7 +413,7 @@ class Scheduler(Container):
     def duplicate_file(self, md5):
         with self.db_lock:
             if not md5 in self.locks:
-                self.locks[md5]= {"read":0, "write":threading.Lock()}
+                self.locks[md5]= {"read":0, "write":Lock()}
                 
         with self.locks[md5]["write"]:
             self.files[md5][1]+=1
@@ -339,8 +422,8 @@ class Scheduler(Container):
     def remove_file(self, md5):
         with self.db_lock: #thread protection
             if not md5 in self.locks:
-                self.locks[md5]= {"read":0, "write":threading.Lock()}
-            condition = threading.Condition(self.locks[md5]["write"])
+                self.locks[md5]= {"read":0, "write":Lock()}
+            condition = Condition(self.locks[md5]["write"])
         
         with condition:
             condition.wait_for(lambda _=None: self.locks[md5]["read"]==0 )   
@@ -359,13 +442,12 @@ class Scheduler(Container):
                 bucket.remove(md5, self.files[md5][0])
                 
             del self.files[md5]
-            #for pg in self.pgs:
-                #print(pg)
 
     def get_file(self, md5):
+        print(md5)
         with self.db_lock: #thread protection
             if not md5 in self.locks:
-                self.locks[md5]= {"read":0, "write":threading.Lock()}
+                self.locks[md5]= {"read":0, "write":Lock()}
         
         with self.locks[md5]["write"]:
             self.locks[md5]["read"] += 1
@@ -387,45 +469,44 @@ class Scheduler(Container):
             self.locks[md5]["read"] -= 1
             return fp2
     
+    ##
+    #
+    # @param struct set of pgs
+    def update_structure(self, replicat, struct):
+        print("Replicat :", replicat)
+        new_scheduler = Scheduler( replicat )
+        for pg in struct:
+            new_scheduler.add(pg)
+            
+        for md5,(size,counter) in self.files.items():
+            key = int(md5, 16)
+
+            new_buckets = set(map( lambda pg: pg.place(key, size), new_scheduler.place_(key)))
+            pre_buckets = set(map( lambda pg: pg.place(key, 0), self.place_(key)))
+            ins_buckets = new_buckets.difference( pre_buckets )
+            del_buckets = pre_buckets.difference( new_buckets )
+            
+            with self.get_file(md5) as fp:
+                for bucket in ins_buckets:
+                    bucket.write(md5, size, fp)
+            
+            for bucket in del_buckets:
+                bucket.remove(md5, size)
+                
+        for pg in new_scheduler.pgs:
+            pg.update_stats()  
+
+        self.replicat = new_scheduler.replicat
+        self.children.clear()
+        self.children.update( new_scheduler.children)
+        self.files.clear()
+        self.files.update( new_scheduler.files)
+        
+        assert( self.replicat == new_scheduler.replicat)
+        assert( self.replicat == replicat)
     #all method below are not thread safe
     def __str__(self):
         return str(self.pgs)  
-          
-    def add_pg(self, pg):
-        if self.passive:
-            return super().add(pg)
-         
-        files_to_move = {}
-        for md5,size in self.files.items():
-            key = int(md5, 16)
-            pgs = self.place_(key)
-            pgs.append( pg )
-            pg_max = max(pgs, key=lambda obj:wrand( obj._id, key))
-            if pg != pg_max:
-                bucket = max_pg.place(key)
-                
-                pg.place(key).write( md5, size, make_path(bucket.path, afile) )
-                bucket.remove( md5, size )
-        
-    def remove_pg(self, pg):
-        if self.passive:
-            return super().remove(pg)
-
-        files_to_move = {}
-        for md5,size in self.files:
-            key = int(md5, 16)
-            pgs = self.place_(key)
-            if pg in pgs:
-                pgs.remove(pg)
-                files_to_move.add( (key, (md5, size), pgs) )
-        
-        self.pgs.discard(pg)
-        
-        for key,(md5, size),pgs in files_to_move:
-            bucket = pg.place( key )
-            for n_pg in filter(lambda n_pg: n_pg not in pgs, self.place_(key)):#en pratique un seul
-                n_pg.place(key).write( md5, size, make_path(bucket.path, md5) )
-            bucket.remove( md5, size )
         
     def parse(self):
         if not os.path.isfile("pgs.json"):
@@ -457,14 +538,14 @@ class Scheduler(Container):
         else:
             self.parse()
         
-        if os.path.isfile("files.json"):
-            with open("files.json", "r") as f :
-                self.files = json.load(f)
+            if os.path.isfile("files.json"):
+                with open("files.json", "r") as f :
+                    self.files = json.load(f)
         
     def store(self):
         with open("files.json", "w") as f :
             json.dump(self.files, f)
-        
+        print("saved replicat", self.replicat)
         with open("scheduler.data", 'wb') as f:
             data={
                 'pgs':self.pgs,
@@ -487,8 +568,8 @@ class Scheduler(Container):
 
         report = {
             "usage": int(100 * float(mc-fc) / float(mc)) if mc > 0 else 0,
-            "capacity": sizeof_fmt(mc-fc),
-            "true_capacity": sizeof_fmt(sum( [ size for size,_ in self.files.values() ] )),
+            "capacity": sizeof_fmt((mc-fc)*self.replicat),
+            "true_capacity": sizeof_fmt(self.replicat * sum( [ size for size,_ in self.files.values() ] )),
             "max_capacity": sizeof_fmt(mc),
             "free_capacity": sizeof_fmt(fc),
             "replicat": self.replicat,
@@ -499,15 +580,6 @@ class Scheduler(Container):
     def buckets(self):
         return itertools.chain( map( Pool.children, self.pgs ))
 
-scheduler=Scheduler()  #variable globale pour l'application jusqu'à ce que je troouve une meilleur idée (FUSE : Linux, Mac)
+scheduler=Scheduler()  #variable globale pour l'application jusqu'à ce que je trouve une meilleure idée (FUSE : Linux, Mac)
 scheduler.load()
-#print("===================================================")
-#test_files = [location_file_default, location_album_default, "pgs.json"]
-#for loc in test_files:
-    #m = scheduler.add_file(loc)
-    #tmp = scheduler.get_file( m )
-    #assert( lipyc.crypto.md5(tmp) == lipyc.crypto.md5(loc))
-    #tmp.close()
-    #scheduler.remove_file(m)
 
-#raise Exception("End")

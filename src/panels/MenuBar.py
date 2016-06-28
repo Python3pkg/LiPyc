@@ -54,7 +54,8 @@ class TopMenu(Menu):
 
     def make_preferences(self):
         m_preferences = Menu(self, tearoff=0)
-        m_preferences.add_command(label="Scheduler", command= self.app.configure_pgs)
+        m_preferences.add_command(label="Scheduler", command= self.app.exasy_configure_pgs)
+        m_preferences.add_command(label="Scheduler( expert)", command= self.app.configure_pgs)
         
         self.add_cascade(label="Preferences", menu=m_preferences)
 

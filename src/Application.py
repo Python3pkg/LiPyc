@@ -524,7 +524,7 @@ class Application(Tk, WorkflowStep):
             files = self.parents_album[-1].deep_files()
         else:
             files = self.library.deep_files()
-        raw_similarities = find_similarities(files, 0.65)
+        raw_similarities = find_similarities(files)
 
         similarities0 = collections.defaultdict( set ) # on dit que ~s est transitive
         for (f1,f2) in raw_similarities:
@@ -614,7 +614,15 @@ class Application(Tk, WorkflowStep):
                 
         self.refresh()
 
-
+    def exasy_configure_pgs(self):
+        self.action = Action.easy_configure_pgs
+        
+        self.rightPanel.hide()
+        self.leftPanel.hide()
+        
+        self.mainPanel.set_easy_scheduler()
+        self.mainPanel.grid(row=0, column=1)
+        
     def configure_pgs(self):
         self.action = Action.configure_pgs
         

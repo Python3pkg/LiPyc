@@ -2,7 +2,7 @@ from distutils.core import setup
 import os
 
 setup(name="lipyc",
-        version="0.3.12.dev1",
+        version="0.3.13.dev1",
         description="A light picture manager",
         author="Laurent Prosperi",
         author_email="laurent.prosperi@ens-cachan.fr",
@@ -30,5 +30,4 @@ setup(name="lipyc",
         package_data={
             "lipyc.data": ["album_default.png", "file_default.png", "default-pgs.json"],
         },
-        include_package_data = True
     )

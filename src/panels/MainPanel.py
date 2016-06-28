@@ -7,6 +7,7 @@ from tkinter.scrolledtext import ScrolledText
 from PIL import Image
 from PIL import ImageTk# https://pillow.readthedocs.io/en/3.2.x/   libjpeg-dev sudo pip3 install pillow  sudo apt-get install libjpeg8-dev python3-pil.imagetk
 from PIL.ExifTags import TAGS
+from tkinter import ttk
 
 import os.path
 import pickle
@@ -17,10 +18,10 @@ import random
 import logging
 import copy
 import threading
-
+from lipyc.scheduler import *
 from math import ceil
 from enum import Enum
-
+import copy
 from timeit import default_timer
 
 from lipyc.panels.Panel import Panel, VScrolledPanel
@@ -421,6 +422,263 @@ class SchedulerPanel(Panel):
         with open(location, "r") as fp:    
             self.textarea.insert(END, fp.read())      
         
+class EasySchedulerPanel(Panel):
+    def __init__(self, app, master, *args, **kwargs):
+        super().__init__(master, bg="white", *args, **kwargs)
+        
+        self.app = app
+        self.memory = {}
+        
+        
+        self.f_buttons = Frame(self)
+        self.f_buttons.pack()
+        self.b_apply = Button(self.f_buttons, text="Apply", 
+            command=lambda _=None:scheduler.update_structure( self.v_replicat.get(),
+            [value for key,value in self.memory.items() if len(key.split('|')) ==1 and key !='']) )
+        self.b_apply.pack(side=LEFT)
+        self.b_reset = Button(self.f_buttons, text="Reset", command=self.reset_all)
+        self.b_reset.pack(side=LEFT)
+        
+        
+        self.f_general = Frame(self)
+        
+        self.v_max_ratio = IntVar()
+        global max_ratio
+        self.v_max_ratio.set( max_ratio )
+        self.e_max_ratio = Entry(self.f_general, textvariable=self.v_max_ratio)
+        self.l_max_ratio = Label(self.f_general, text="max_ratio")
+        self.l_max_ratio.grid(row=0, column=0)
+        self.e_max_ratio.grid(row=0, column=1)
+        
+        self.v_replicat = IntVar()
+        self.v_replicat.set( scheduler.replicat )
+        self.e_replicat = Entry(self.f_general, textvariable=self.v_replicat)
+        self.l_replicat = Label(self.f_general, text="replicat")
+        self.l_replicat.grid(row=1, column=0)
+        self.e_replicat.grid(row=1, column=1)
+        
+        self.f_general.pack()
+        
+        
+        ####
+        self.f_pgs = Frame(self)
+        self.f_pgs.pack()
+        self.tree = ttk.Treeview(self.f_pgs, columns=('aeskey', 'crypt', 
+        'max_capacity', 'speed', 'path'))
+        self.tree.heading('aeskey', text='AESkey')
+        self.tree.heading('crypt', text='Crypt')
+        self.tree.heading('max_capacity', text='Capacity')
+        self.tree.heading('speed', text='Speed')
+        self.tree.heading('path', text='Path')
+
+        self.tree.grid(row=0, column=0)
+        self.tree.grid(row=0, column=0)
+        
+        self.ysb = ttk.Scrollbar(self.f_pgs, orient='vertical', command=self.tree.yview)
+        self.xsb = ttk.Scrollbar(self.f_pgs, orient='horizontal', command=self.tree.xview)
+        self.tree.configure(yscroll=self.ysb.set, xscroll=self.xsb.set)
+        self.ysb.grid(row=0, column=1, sticky='ns')
+        self.xsb.grid(row=1, column=0, sticky='ew')
+        
+        self.make_tree()
+        
+        self.f_pgs_buttons = Frame(self.f_pgs)
+        self.f_pgs_buttons.grid(row=2, column=0)
+        self.b_add = Button(self.f_pgs_buttons, text="Add", 
+            command=lambda _=None:self.build_add(self.tree.focus()))
+        self.b_add.pack(side=LEFT)
+        self.b_remove = Button(self.f_pgs_buttons, text="Remove", 
+            command=lambda _=None:self.app.build_)
+        self.b_remove.pack(side=LEFT)
+        self.b_update = Button(self.f_pgs_buttons, text="Update", 
+            command=lambda _=None:self.build_update(self.tree.focus()))
+        self.b_update.pack(side=LEFT)
+        ###
+        
+        self.f_area = Frame(self)
+        
+        self.common_area = Frame(self.f_area)
+        self.common_area.pack()
+        self.l_area_name = Label(self.common_area, text="Name")
+        self.l_area_name.grid(row=0, column=0)
+        self.v_area_name = StringVar()
+        self.e_area_name = Entry(self.common_area, textvariable=self.v_area_name)
+        self.e_area_name.grid(row=0, column=1)
+        
+        self.bucket_area = Frame(self.f_area)
+        self.bucket_area.pack()
+        self._bucket_area = Frame(self.bucket_area)
+        self.l_area_aeskey = Label(self._bucket_area, text="AESKey")
+        self.l_area_aeskey.grid(row=1, column=0)
+        self.v_area_aeskey = StringVar()
+        self.e_area_aeskey = Entry(self._bucket_area, textvariable=self.v_area_aeskey)
+        self.e_area_aeskey.grid(row=1, column=1)
+        
+        self.l_area_crypt = Label(self._bucket_area, text="Crypt?")
+        self.l_area_crypt.grid(row=2, column=0)
+        self.v_area_crypt = BooleanVar()
+        self.e_area_crypt = Entry(self._bucket_area, textvariable=self.v_area_crypt)
+        self.e_area_crypt.grid(row=2, column=1)
+        
+        self.l_area_max_capacity = Label(self._bucket_area, text="Capacity( Bytes)")
+        self.l_area_max_capacity.grid(row=3, column=0)
+        self.v_area_max_capacity = IntVar()
+        self.e_area_max_capacity = Entry(self._bucket_area, textvariable=self.v_area_max_capacity)
+        self.e_area_max_capacity.grid(row=3, column=1)
+        
+        self.l_area_speed = Label(self._bucket_area, text="Speed")
+        self.l_area_speed.grid(row=4, column=0)
+        self.v_area_speed = DoubleVar()
+        self.e_area_speed = Entry(self._bucket_area, textvariable=self.v_area_speed)
+        self.e_area_speed.grid(row=4, column=1)
+        
+        self.l_area_path = Label(self._bucket_area, text="Path")
+        self.l_area_path.grid(row=5, column=0)
+        self.v_area_path = StringVar()
+        self.e_area_path = Entry(self._bucket_area, textvariable=self.v_area_path)
+        self.e_area_path.grid(row=5, column=1)
+ 
+        self.b_area_process = Button(self.f_area, text="Process")
+        self.b_area_process.pack()
+    
+    def reset_all(self):
+        self.tree.delete(*self.tree.get_children())
+        self.f_area.pack_forget()
+        
+        global max_ratio
+        self.v_max_ratio.set( max_ratio )
+        self.v_replicat.set( scheduler.replicat )
+        
+        print(max_ratio)
+        self.make_tree()
+    
+    def make_tree(self):
+        self.memory[''] = None
+        for pg in scheduler.pgs:
+            self.tree.insert( "", 'end',  pg.name , text=pg.name)
+            self.memory[ pg.name ] = copy.deepcopy(pg)
+            for pool in pg.children:
+                self.tree.insert( pg.name, 'end',  pool.name, 
+                    text=pool.name.split('|')[-1])
+                self.memory[ pool.name ] = copy.deepcopy(pool)
+                for bucket in pool.children:
+                    self.tree.insert( pool.name, 'end',  bucket.name ,
+                        text=bucket.name.split('|')[-1],
+                        values=[bucket.aeskey, bucket.crypt, 
+                        bucket.max_capacity, bucket.speed, bucket.path])
+                    self.memory[ bucket.name ] = copy.deepcopy(bucket)
+            
+    def build_add(self, parent_id):
+        self.b_area_process.configure(command= lambda _=None:self.process_add(parent_ids))
+        parent = self.memory[parent_id]
+        if len(name.split('|')) == 3: #bucket
+            self.v_area_aeskey.set("")
+            self.v_area_crypt.set(False)
+            self.v_area_max_capacity.set(0)
+            self.v_area_speed.set(1.0)
+            self.v_area_path.set("")
+            
+            self.f_area.pack()
+            self._bucket_area.pack()
+        else:
+            self.f_area.pack()
+            self._bucket_area.pack_forget()
+   
+    def build_update(self, current_id):
+        self.b_area_process.configure(command= lambda _=None:self.process_update(current_id))
+        current = self.memory[current_id]
+        name = current.name
+
+        self.v_area_name.set( name.split('|')[-1] )
+        
+        if len(name.split('|')) == 3: #bucket
+            self.v_area_aeskey.set(current.aeskey)
+            self.v_area_crypt.set(current.crypt)
+            self.v_area_max_capacity.set(current.max_capacity)
+            self.v_area_speed.set(current.speed)
+            self.v_area_path.set(current.path)
+            
+            self.f_area.pack()
+            self._bucket_area.pack()
+        else:
+            self.f_area.pack()
+            self._bucket_area.pack_forget()
+            
+    def process_add(self, parent_id):
+        parent_name = self.memory[parent_id].name
+        name = parent_name+'|'+self.v_area_name.get() if parent_name else self.v_area_name.get()
+        values=[]
+        if not parent_name: #pg 
+            self.memory[name] = PG(name)
+        elif len(parent_name.split('|')) == 1: #pool
+            self.memory[name] = Pool(name)
+            self.memory[parent_name].add( self.memory[name] )
+        else: #bucket
+            self.memory[parent_name].add( self.memory[name] )
+            self.memory[name]=Bucket(name=name, 
+                aeskey=self.v_area_aeskey.get(),
+                crypt=self.v_area_crypt.get(),
+                max_capacity=self.v_area_max_capacity.get(),
+                path=self.v_area_path.get(),
+                speed=self.v_area_speed.get()
+                )
+        
+            values = [self.v_area_aeskey.get(), self.v_area_crypt.get(),
+            self.v_area_max_capacity.get(), self.v_area_speed.get(), 
+            self.v_area_path.get()]
+            
+        self.tree.insert( parent_name, 'end',  name.split('|')[-1], 
+            text=name, values=values)
+        self.f_area.pack_forget()
+           
+    def process_update(self, current_id):
+        previous_name = self.memory[ current_id ].name
+        name = '|'.join( previous_name.split('|')[:-1] + [self.v_area_name.get()] )
+        parent_id =  '|'.join( previous_name.split('|')[:-1])
+        
+        if len(previous_name.split('|')[:-1])==1: #pg 
+            self.memory[current_id] = PG(name)
+            self.tree.item( current_id, text=name.split('|')[-1])
+
+        elif len(previous_name.split('|')) == 2: #pool
+            self.memory[parent_id].remove( self.memory[current_id] )
+            self.memory[current_id] = Pool(name)
+            self.memory[parent_id].add( self.memory[current_id] )
+
+            
+            self.tree.item( current_id, text=name.split('|')[-1])
+        else: #bucket
+            self.memory[parent_id].remove( self.memory[current_id] )
+            self.memory[current_id]=Bucket(name=name, 
+                aeskey=self.v_area_aeskey.get(),
+                crypt=self.v_area_crypt.get(),
+                max_capacity=self.v_area_max_capacity.get(),
+                path=self.v_area_path.get(),
+                speed=self.v_area_speed.get()
+                )
+            self.memory[parent_id].add( self.memory[current_id] )
+            
+            
+            self.tree.item( current_id, text=name.split('|')[-1])
+            self.tree.set( current_id, 'aeskey', self.v_area_aeskey.get())
+            self.tree.set( current_id, 'crypt', self.v_area_crypt.get())
+            self.tree.set( current_id, 'max_capacity', self.v_area_max_capacity.get())
+            self.tree.set( current_id, 'speed', self.v_area_speed.get())
+            self.tree.set( current_id, 'path', self.v_area_path.get())
+            self.f_area.pack_forget()
+        
+        self.f_area.pack_forget()
+
+        
+    def refresh(self):
+        pass
+            
+    def reset(self):
+        pass
+            
+    def set(self):  
+        pass     
+        
 
 class DisplayPanel(Panel):
     def __init__(self, app, master, *args, **kwargs):
@@ -487,7 +745,8 @@ class MainPanel(Panel):
         self.centers = {
             "pagination" : PaginationPanel(app, self, num_x, num_y, height=500),
             "display" : DisplayPanel(app, self),
-            "scheduler": SchedulerPanel(app, self)
+            "scheduler": SchedulerPanel(app, self),
+            "easy_scheduler": EasySchedulerPanel(app, self),
         }
         
         for panel in self.centers.values() :
@@ -549,6 +808,17 @@ class MainPanel(Panel):
             self.centerPanel.hide()
         
         self.centerPanel = self.centers["scheduler"]
+        self.centerPanel.set()
+        self.centerPanel.show()
+        
+    def set_easy_scheduler(self):
+        self.bottomPanel.hide()
+        self.topPanel.hide()
+        
+        if self.centerPanel != self.centers["easy_scheduler"]:
+            self.centerPanel.hide()
+            
+        self.centerPanel = self.centers["easy_scheduler"]
         self.centerPanel.set()
         self.centerPanel.show()
         

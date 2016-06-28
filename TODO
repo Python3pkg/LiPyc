@@ -1,14 +1,13 @@
--> search
--> album/image tag 
+-> tester scheduler 
 -> migration pikle vers SQLite(qqch un peu plus robuste )
 -> outil(s) de restauration pour scheduler
+
+-> search
+-> album/image tag 
+
 -> chiffré les clés aes à l'aide d'un mdp au démarrage
--> système de rapport(vers un serveur perso) : pour controler scheduler, usage cache
--> face detection and recognition
+#-> système de rapport(vers un serveur perso) : pour controler scheduler, usage cache
 -> jobs number and progress bar
+-> schdeuler update_strcutureet progress bar
 
-attentino add_to et copy_to pareil pour un fichier
-
-
-http://www.pyimagesearch.com/2015/07/20/install-opencv-3-0-and-python-3-4-on-ubuntu/
-version3.0.0 pas l'autre
+attention add_to et copy_to pareil pour un fichier
