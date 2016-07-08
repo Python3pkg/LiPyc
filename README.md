@@ -1,14 +1,14 @@
 # LiPyc - a light picture manager
 
 ## Features
-- Replication, and load-balancing between storage sources
+- Replication, and load-balancing between data storage devices
+- Data recovery tool for failure mitigation
 - File encryption
 - File deduplication at application scale
 - Pictures' similarities detection
 
 ## Restriction
 - Not suitable for big databases
-- No restauration tool, yet
 - Storage sources must be mounted in user-space
 
 ## Dependencies
