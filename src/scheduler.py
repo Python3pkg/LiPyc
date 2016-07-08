@@ -13,13 +13,13 @@ import pickle
 from threading import Lock, Condition
 import collections
 import sys
-
+from time import time
 from random import random
 
 def wrand(seed, value):
     a, b = 6364136223846793005, 1
     
-    return a * ((a * seed + b) ^ value ) + b; 
+    return (a * ((a * seed + b) ^ value ) + b) % (2**32); 
 
 def make_path(path, md5):
     return os.path.join( path, "%s" % md5) 
@@ -120,7 +120,7 @@ class Container:
         return hash(self.name)
 
     def __str__(self, ident=' '):
-        buff="%sContainer: %s, %d/%d : %f\n" % (ident,self.name, self.free_capacity, self.max_capacity, float(self.free_capacity)/(float(self.max_capacity+1)))
+        buff="%sContainer %d: %s, %d/%d : %f\n" % (ident, self._id, self.name, self.free_capacity, self.max_capacity, float(self.free_capacity)/(float(self.max_capacity+1)))
         for child in self.children:
             buff+=child.__str__(ident*2)
         return buff
@@ -136,6 +136,12 @@ class Container:
             '_min_obj':self._min_obj,
         }
     
+    def clear(self):
+        self.free_capacity = self.max_capacity
+        
+        for x in self.children :
+            x.clear()
+        
     def __setstate__(self, state):
         self._id = state['_id']
         self.name = state['name']
@@ -183,9 +189,12 @@ class Bucket: #décrit un dossier ex: photo, gdrive, dropbox
                 self.free_capacity -= 2*lipyc.crypto.BS
             assert(self.free_capacity >= 0)
         
+        if not fp :
+            return 
+            
         last = fp.tell()
         fp.seek(0)
-
+        
         if self.crypt :
             cipher = AESCipher(self.aeskey)
             with open(make_path(self.path, md5), "wb") as fp2:
@@ -209,7 +218,7 @@ class Bucket: #décrit un dossier ex: photo, gdrive, dropbox
         return hash(self.name)
     
     def __str__(self, ident=' '):
-        buff="%sBucket: %s, %d/%d : %f\n" % (ident, self.name, self.free_capacity, self.max_capacity, float(self.free_capacity)/(float(self.max_capacity+1)))
+        buff="%sBucket %d: %s, %d/%d : %f\n" % (ident, self._id, self.name, self.free_capacity, self.max_capacity, float(self.free_capacity)/(float(self.max_capacity+1)))
 
         return buff
         
@@ -235,6 +244,9 @@ class Bucket: #décrit un dossier ex: photo, gdrive, dropbox
         self.speed = state['speed']
         self.path = state['path']
         self.lock=Lock()
+    
+    def clear(self):
+        self.free_capacity = self.max_capacity
 
 class Pool(Container):  #on décrit un disque par exemple avec pool
     def make(name, json_pool, aeskey):#config json to pool
@@ -270,7 +282,7 @@ class Pool(Container):  #on décrit un disque par exemple avec pool
    
     @lock_protection
     def buckets(self):
-        return itertools.chain( self.children )
+        return self.children
 
 class PG(Container):
     def make(name, json_pg, aeskey):#config json to pg
@@ -313,7 +325,7 @@ class PG(Container):
       
     @lock_protection
     def buckets(self):
-        return itertools.chain( map( Pool.children, self.children ))
+        return itertools.chain( *list(map( lambda x:x.buckets(), self.children )))
     
     @lock_protection
     def prune(self):
@@ -321,6 +333,8 @@ class PG(Container):
             if not child.children:
                 self.remove(child)
 
+counter = 0
+delay_snapshot = 100#nombre d'operations entre deux snapshots
 class Scheduler(Container):
     def __init__(self, replicat=2):
         super().__init__()
@@ -333,6 +347,17 @@ class Scheduler(Container):
         
         self.db_lock = Lock()
         self.locks = {}#md5=>num_read,write_lock
+            
+        self.history = []#must be locked by_dblock
+        self.previous_snapshot = 0
+        
+    def snapshot(self): #should be called in db_lock mod
+        if delay_snapshot <= len(self.history) and self.previous_snapshot<time():
+            t= time()
+            with open("snapshot-%d.json" % t, "w") as f :
+                json.dump(self.history, f)
+                self.history.clear()
+            self.previous_snapshot = t
         
     def prune(self):
         with self.db_lock:
@@ -367,21 +392,27 @@ class Scheduler(Container):
         
     def add_file(self, fp, md5=None, size=None ): #current location of the file, fp location or file descriptor
         self.passive = False
-        if isinstance(fp, str):
-            fp = open(fp, "rb")
-        else:
-            fp.seek(0)
+        if fp:
+            if isinstance(fp, str):
+                fp = open(fp, "rb")
+            else:
+                fp.seek(0)
             
         if not md5:
             md5 = lipyc.crypto.md5( fp )
             
         if not size or size <= 0:
             size = os.fstat(fp.fileno()).st_size
-            
-        if md5 in self.files: #deduplication ici
-            self.files[md5][1]+=1
-            return md5
-            
+           
+        with self.db_lock:
+            self.snapshot()
+            if md5 in self.files: #deduplication ici
+                self.files[md5][1]+=1
+                self.history.append( ('update',md5, self.files[md5][1]) )
+                return md5
+            else:
+                self.history.append( ('added', md5, size) )
+                
         with self.db_lock: #thread protection
             if not md5 in self.locks:
                 self.locks[md5]= {"read":0, "write":Lock()}
@@ -394,11 +425,12 @@ class Scheduler(Container):
             assert(len(list(self.place(key, 0))) == self.replicat)
             for bucket in self.place(key, size):
                 bucket.write( md5, size, fp )
-            
-            if md5 not in self.files:
-                self.files[md5] = [size,1]
-            else:
-                self.files[md5][1] += 1
+            global counter
+            counter+=1
+            print( counter)
+            self.files[md5] = [size,1]
+            self.history.append( ('added', md5, size) )
+
                 
             return md5
             
@@ -411,16 +443,23 @@ class Scheduler(Container):
             return md5 in self.files
      
     def duplicate_file(self, md5):
+        if not md5 in self.files:
+            raise Exception("Scheduler, file can not be duplicated because it does not exist")
         with self.db_lock:
+            self.snapshot()
             if not md5 in self.locks:
                 self.locks[md5]= {"read":0, "write":Lock()}
                 
         with self.locks[md5]["write"]:
             self.files[md5][1]+=1
+            with self.db_lock:
+                self.history.append( ('update', md5, self.files[md5][1]) )
+
             return md5
         
     def remove_file(self, md5):
         with self.db_lock: #thread protection
+            self.snapshot()
             if not md5 in self.locks:
                 self.locks[md5]= {"read":0, "write":Lock()}
             condition = Condition(self.locks[md5]["write"])
@@ -442,6 +481,9 @@ class Scheduler(Container):
                 bucket.remove(md5, self.files[md5][0])
                 
             del self.files[md5]
+        
+        with self.db_lock:
+            self.history.append( ('removed', md5, None) )
 
     def get_file(self, md5):
         print(md5)
@@ -532,15 +574,15 @@ class Scheduler(Container):
             with open( "scheduler.data", 'rb') as f:
                 data = pickle.load(f)
                 self.pgs.update(data["pgs"] )
-                self.files.update(data["files"] )
+                #self.files.update(data["files"] )
                 self.replicat = data["replicat"]
                 self.passive = data["passive"]
         else:
             self.parse()
         
-            if os.path.isfile("files.json"):
-                with open("files.json", "r") as f :
-                    self.files = json.load(f)
+        if os.path.isfile("files.json"):
+            with open("files.json", "r") as f :
+                self.files = json.load(f)
         
     def store(self):
         with open("files.json", "w") as f :
@@ -555,6 +597,11 @@ class Scheduler(Container):
             }
             
             pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
+        
+        self.snapshot()
+        global delay_snapshot
+        delay_snapshot = 1
+        self.snapshot()
     
     def info(self):        
         measurement_unit = 1024*1024#calcul exacte par raport à l'unité choisie(heuristic....)
@@ -578,8 +625,50 @@ class Scheduler(Container):
         return report
     
     def buckets(self):
-        return itertools.chain( map( Pool.children, self.pgs ))
+        return itertools.chain( *list(map( lambda x:x.buckets(), self.pgs )) )
+    
+    def quick_restore(self):#no thread safe and must not be thread safe, be carfull must be used at the start of the application
+        self.clear()
+        self.history.clear()
+        begin = time() #faut supprimer tout les trucs créée entre temps
+        
+        locations= []
+        for path, dirs, files in os.walk('.'):
+            for filename in files:
+                location = os.path.join(path, filename)
+                
+                if filename[:9] == 'snapshot-' and int(filename[9:-5])<begin :  
+                    locations.append(location)
+        
+        for location in sorted(locations):
+            with open(location, "r") as f :
+                history = json.load(f)
+                
+            for t, md5, v1 in history:
+                if t == 'added':
+                    self.add_file( None, md5, v1)
+                elif t == 'update' :
+                    for k in range(v1-self.files[md5][1]):
+                        self.duplicate_file(md5)
+                elif t == 'removed':
+                    self.remove_file(md5)
+        
+        self.history.clear()
+        for path, dirs, files in os.walk('.'):
+            for filename in files:
+                location = os.path.join(path, filename)
+                if filename[:9] == 'snapshot-' and int(filename[9:-5])>=begin :
+                    os.remove( location )
+        
+        print("End restore!!")
+    #no restoration from file analisys, because we lost the reference counter so nothing good
+    def clear(self):
+        with self.db_lock:
+            super().clear()
+            self.files.clear()
 
 scheduler=Scheduler()  #variable globale pour l'application jusqu'à ce que je trouve une meilleure idée (FUSE : Linux, Mac)
 scheduler.load()
 
+for pg in scheduler.pgs:
+    print(pg)

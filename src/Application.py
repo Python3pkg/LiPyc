@@ -614,7 +614,7 @@ class Application(Tk, WorkflowStep):
                 
         self.refresh()
 
-    def exasy_configure_pgs(self):
+    def easy_configure_pgs(self):
         self.action = Action.easy_configure_pgs
         
         self.rightPanel.hide()
@@ -637,3 +637,17 @@ class Application(Tk, WorkflowStep):
             fp.write(data)
             
         scheduler.parse()
+    
+    def quick_restore_files(self):
+        for th in self.io_threads:
+            if th.is_alive():
+                th.join()
+        
+        scheduler.quick_restore()
+    
+    def full_restore_files(self):
+        for th in self.io_threads:
+            if th.is_alive():
+                th.join()
+                
+        scheduler.full_restore()

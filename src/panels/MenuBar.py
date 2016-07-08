@@ -31,6 +31,7 @@ class TopMenu(Menu):
         self.make_import()
         self.make_export()
         self.make_functions()
+        self.make_utilities()
         self.make_preferences()
 
     def make_file(self):
@@ -54,10 +55,16 @@ class TopMenu(Menu):
 
     def make_preferences(self):
         m_preferences = Menu(self, tearoff=0)
-        m_preferences.add_command(label="Scheduler", command= self.app.exasy_configure_pgs)
+        m_preferences.add_command(label="Scheduler", command= self.app.easy_configure_pgs)
         m_preferences.add_command(label="Scheduler( expert)", command= self.app.configure_pgs)
         
         self.add_cascade(label="Preferences", menu=m_preferences)
+        
+    def make_utilities(self):
+        m_utilities = Menu(self, tearoff=0)
+        m_utilities.add_command(label="Restore files", command= self.app.quick_restore_files)
+        
+        self.add_cascade(label="Uilities", menu=m_utilities)
 
     def make_functions(self):
         m_func = Menu(self, tearoff=0)
