@@ -4,7 +4,7 @@ import numpy as np
 import sys
 from matplotlib import pyplot as plt
 
-from lipyc.scheduler import scheduler
+#from lipyc.scheduler import scheduler
 
 #https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_template_matching/py_template_matching.html
 #help(cv2)

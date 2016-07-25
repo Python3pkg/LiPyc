@@ -13,7 +13,7 @@ import pickle
 from threading import Lock, Condition
 import collections
 import sys
-from time import time
+from time import time, sleep
 from random import random
 
 def wrand(seed, value):
@@ -21,8 +21,8 @@ def wrand(seed, value):
     
     return (a * ((a * seed + b) ^ value ) + b) % (2**32); 
 
-def make_path(path, md5):
-    return os.path.join( path, "%s" % md5) 
+def make_path(path, lib_name, md5):
+    return os.path.join( path, "data", "%s-%s" % (lib_name, md5) ) 
 
 def lock_protection(method):
     def warper(self, *args, **kwargs):
@@ -153,15 +153,19 @@ class Container:
         self.lock=Lock()
              
 class Bucket: #décrit un dossier ex: photo, gdrive, dropbox
-    def make(name, json_bucket, aeskey):
-        return Bucket(path=json_bucket["path"], 
+    def make(lib_name, name, json_bucket, aeskey):
+        print( lib_name)
+        return Bucket(
+            lib_name = lib_name,
+            path=json_bucket["path"], 
             max_capacity=json_bucket["max_capacity"],
             speed=json_bucket["speed"],
             name=name,
             crypt=json_bucket["crypt"],
             aeskey=json_bucket["aeskey"] if "aeskey" in json_bucket else aeskey)
             
-    def __init__(self, max_capacity=0, path="", speed=1.0, name="", crypt=False, aeskey=""):
+    def __init__(self, lib_name, max_capacity=0, path="", speed=1.0, name="", crypt=False, aeskey=""):
+        self.lib_name = lib_name
         self._name = name
         self.crypt = crypt
         self.aeskey = aeskey
@@ -173,6 +177,13 @@ class Bucket: #décrit un dossier ex: photo, gdrive, dropbox
         
         self.lock = Lock()
         self._id =  generate_id(name)
+        
+        dirs = ["data", "locks", "metadata"] 
+        for d in dirs:
+            tmp = os.path.join(path, d)
+            if not os.isdir(tmp):
+                os.mkdir(tmp)
+                
     @property
     def name(self):
         return self._name
@@ -197,10 +208,10 @@ class Bucket: #décrit un dossier ex: photo, gdrive, dropbox
         
         if self.crypt :
             cipher = AESCipher(self.aeskey)
-            with open(make_path(self.path, md5), "wb") as fp2:
+            with open(make_path(self.path, self.lib_name, md5), "wb") as fp2:
                 cipher.encrypt_file( fp, fp2)
         else:
-            with open(make_path(self.path, md5), "wb") as fp2:
+            with open(make_path(self.path, self.lib_name, md5), "wb") as fp2:
                 shutil.copyfileobj(fp, fp2)
                 
         fp.seek(last)
@@ -209,7 +220,7 @@ class Bucket: #décrit un dossier ex: photo, gdrive, dropbox
         with self.lock:
             self.free_capacity += size        
             assert(self.free_capacity <= self.max_capacity)
-        os.remove( make_path(self.path, md5) )
+        os.remove( make_path(self.path, self.lib_name, md5) )
     
     def __eq__(self, other):
         return self.name == other.name
@@ -225,6 +236,7 @@ class Bucket: #décrit un dossier ex: photo, gdrive, dropbox
     def __getstate__(self):
         return {
             '_id':self._id,
+            'lib_name':self.lib_name,
             'name':self.name,
             'crypt':self.crypt,
             'aeskey':self.aeskey,
@@ -236,6 +248,7 @@ class Bucket: #décrit un dossier ex: photo, gdrive, dropbox
         
     def __setstate__(self, state):
         self._id = state['_id']
+        self.lib_name = state['lib_name']
         self.name = state['name']
         self.crypt = state['crypt']
         self.aeskey = state['aeskey']
@@ -248,13 +261,31 @@ class Bucket: #décrit un dossier ex: photo, gdrive, dropbox
     def clear(self):
         self.free_capacity = self.max_capacity
 
+    def try_lock(self, idclient, ttl):
+        onlyfiles = [f for f in listdir(os.path.join(self.path, "locks")) if isfile(join(path, f))]
+        for f in onlyfiles:
+            if int(f.split("-")[3]) + ttl > time():
+                return False
+        
+        fp = open( os.path.join(self.path, "locks", "lock_%s_%d_%d" % (self.lib_name, idclient, time()), 'w'))
+        fp.write('0')
+        
+        return True
+        
+    def is_locked(self, idclient, ttl):
+        onlyfiles = [f for f in listdir(os.path.join(self.path, "locks")) if isfile(join(path, f))]
+        for f in onlyfiles:
+            if int(f.split("-")[3]) + ttl > time() and f.split("-")[2] != idclient:
+                return False
+        return True
+        
 class Pool(Container):  #on décrit un disque par exemple avec pool
-    def make(name, json_pool, aeskey):#config json to pool
+    def make(lib_name, name, json_pool, aeskey):#config json to pool
         pool = Pool(name)
         aeskey = json_pool["aeskey"] if "aeskey" in json_pool else ""
         
         for _name, json_pool in json_pool["buckets"].items():
-            pool.add( Bucket.make(name+"|"+_name, json_pool, aeskey) )
+            pool.add( Bucket.make(lib_name, name+"|"+_name, json_pool, aeskey) )
         
         return pool
     
@@ -285,11 +316,11 @@ class Pool(Container):  #on décrit un disque par exemple avec pool
         return self.children
 
 class PG(Container):
-    def make(name, json_pg, aeskey):#config json to pg
+    def make(lib_name, name, json_pg, aeskey):#config json to pg
         pg = PG(name)
         aeskey = json_pg["aeskey"] if "aeskey" in json_pg else ""
         for _name, json_pool in json_pg["pools"].items():
-            pg.add( Pool.make(name+"|"+_name, json_pool, aeskey) )
+            pg.add( Pool.make(lib_name, name+"|"+_name, json_pool, aeskey) )
         
         return pg
     
@@ -336,8 +367,13 @@ class PG(Container):
 counter = 0
 delay_snapshot = 100#nombre d'operations entre deux snapshots
 class Scheduler(Container):
-    def __init__(self, replicat=2):
+    ##
+    # lib_name - uniq id, used lib name for instance
+    def __init__(self, lib_name, replicat=2):
         super().__init__()
+        self.idclient = random()
+        self.lib_name = lib_name
+        
         self.pgs = self.children
         self.replicat = replicat
         
@@ -350,6 +386,26 @@ class Scheduler(Container):
             
         self.history = []#must be locked by_dblock
         self.previous_snapshot = 0
+        
+    ## Passive lock, for writting
+    def lock_all():
+        delay = 2
+        ttl = 120
+        
+        while True:
+            for bucket in self.buckets:
+                if not bucket.try_lock(self.idclient, ttl): #can be async rewrite
+                    sleep(delay)
+                    continue
+            
+            sleep(delay)
+            
+            for bucket in self.buckets:
+                if not bucket.is_locked(self.idclient):
+                    sleep(delay)
+                continue
+            
+            
         
     def snapshot(self): #should be called in db_lock mod
         if delay_snapshot <= len(self.history) and self.previous_snapshot<time():
@@ -420,7 +476,7 @@ class Scheduler(Container):
         
         with condition:
             condition.wait_for(lambda _=None: self.locks[md5]["read"]==0 )    
-            
+            print(self.pgs)
             key = int(md5, 16)
             assert(len(list(self.place(key, 0))) == self.replicat)
             for bucket in self.place(key, size):
@@ -502,11 +558,11 @@ class Scheduler(Container):
         bucket = self.access(key)
         if not bucket.crypt:
             self.locks[md5]["read"] -= 1
-            return open( make_path(bucket.path, md5), "rb")
+            return open( make_path(bucket.path, self.lib_name, md5), "rb")
         else:
             cipher = AESCipher(bucket.aeskey)
             fp2 = tempfile.TemporaryFile(mode="r+b")
-            with open(make_path(bucket.path, md5), "rb") as fp:
+            with open(make_path(bucket.path, self.lib_name, md5), "rb") as fp:
                 cipher.decrypt_file( fp, fp2)
             self.locks[md5]["read"] -= 1
             return fp2
@@ -566,7 +622,7 @@ class Scheduler(Container):
 
             pgs=list(config["pgs"].items())
             for name, json_pg in pgs:
-                tmp = PG.make(name, json_pg, aeskey)
+                tmp = PG.make(self.lib_name, name, json_pg, aeskey)
                 self.add( tmp )
     
     def load(self):
@@ -585,6 +641,8 @@ class Scheduler(Container):
                 self.files = json.load(f)
         
     def store(self):
+        print("Storing scheduler")
+        print(self.files)
         with open("files.json", "w") as f :
             json.dump(self.files, f)
         print("saved replicat", self.replicat)
@@ -667,8 +725,8 @@ class Scheduler(Container):
             super().clear()
             self.files.clear()
 
-scheduler=Scheduler()  #variable globale pour l'application jusqu'à ce que je trouve une meilleure idée (FUSE : Linux, Mac)
-scheduler.load()
+#scheduler=Scheduler()  #variable globale pour l'application jusqu'à ce que je trouve une meilleure idée (FUSE : Linux, Mac)
+#scheduler.load()
 
-for pg in scheduler.pgs:
-    print(pg)
+#for pg in scheduler.pgs:
+    #print(pg)

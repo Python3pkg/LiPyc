@@ -5,3 +5,4 @@ dist/
 files.json
 web/
 MANIFEST
+snapshot-*

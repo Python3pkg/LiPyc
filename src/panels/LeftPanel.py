@@ -1,6 +1,6 @@
 from lipyc.panels.Panel import Panel
 from lipyc.panels.RightPanel import InfoPanel
-from lipyc.scheduler import scheduler
+#from lipyc.scheduler import scheduler
 
 class LeftPanel(Panel):
     def __init__(self, app, master, *args, **kwargs):
@@ -20,7 +20,7 @@ class LeftPanel(Panel):
         self.scheduler_info = None
     
     def set(self, objs):#display only the status of the scheduler
-        report = scheduler.info()
+        report = self.app.library.scheduler.info()
         if self.scheduler_info == report:
             return
         self.scheduler_info = report

@@ -18,17 +18,18 @@ import random
 import logging
 import copy
 import threading
-from lipyc.scheduler import *
 from math import ceil
 from enum import Enum
 import copy
 from timeit import default_timer
-
+from lipyc.fs.config import max_ratio
+from lipyc.fs.bucket import Bucket
+from lipyc.fs.pool import Pool
+from lipyc.fs.pg import PG
 from lipyc.panels.Panel import Panel, VScrolledPanel
 from lipyc.Album import Album
 from lipyc.File import File
 from lipyc.config import *
-from lipyc.scheduler import scheduler
 
 
 sort_functions={
@@ -223,7 +224,6 @@ class PaginationBottomPanel(Panel):
             return None
         
         for k in range(0, min(len(texts), len(self.buttons))):
-            print(texts[k])
             self.buttons[k].configure( text=texts[k], command=callbacks[k] )
             self.buttons[k].grid(row=0, column=k+1)
             
@@ -321,13 +321,12 @@ class Tile(Panel):
         if obj.thumbnail in thumbnails_cache:
             self.data = thumbnails_cache[obj.thumbnail]
         else:
-            self.data = ImageTk.PhotoImage( Image.open(scheduler.get_file( obj.thumbnail ) ))
-            thumbnails_cache[obj.thumbnail] = self.data
-        
-        if isinstance(obj, Album):
-            callback1, callback2 = self.set_album(obj, k)
-        else:
-            callback1, callback2 = self.set_file(obj, k)
+            afile = self.app.library.scheduler.get_file( obj.thumbnail )
+            if afile:
+                self.data = ImageTk.PhotoImage( Image.open(afile))
+                thumbnails_cache[obj.thumbnail] = self.data
+            else:
+                self.data = ImageTk.PhotoImage(Image.open(location_album_default))
         
         self.obj = obj
         self.version = obj.version()
@@ -337,12 +336,18 @@ class Tile(Panel):
             
         self.thumbnail.delete("all")
         self.thumbnail.create_image(offset_width, offset_height, anchor=NW, image=self.data) 
+        self.thumbnail.pack(padx=BORDER_THUMB/2, pady = BORDER_THUMB/2)
+        
+        if isinstance(obj, Album):
+            callback1, callback2 = self.set_album(obj, k)
+        else:
+            callback1, callback2 = self.set_file(obj, k)
         self.thumbnail.bind('<Double-Button-1>', callback1 ) 
         self.thumbnail.bind('<Triple-Button-1>', callback1 ) 
         self.thumbnail.bind('<Button-3>', callback1 ) 
         self.thumbnail.bind('<Button-1>', callback2 ) 
     
-        self.thumbnail.pack(padx=BORDER_THUMB/2, pady = BORDER_THUMB/2)
+        
         
 class PaginationPanel(VScrolledPanel):
     def __init__(self, app, master, num_x, num_y, *args, **kwargs):
@@ -373,7 +378,7 @@ class PaginationPanel(VScrolledPanel):
     def set(self, objs):        
         if objs:
             tmp = objs.pop()
-            objs.add( tmp )
+            objs.add( tmp )            
             objs = list(sorted( objs, key=sort_functions[self.app.sortname][type(tmp)]))[self.app.current*self.num_x*self.num_y:]
             self.app.set_last_objs(self.app.current_pagination, objs)
 
@@ -433,7 +438,7 @@ class EasySchedulerPanel(Panel):
         self.f_buttons = Frame(self)
         self.f_buttons.pack()
         self.b_apply = Button(self.f_buttons, text="Apply", 
-            command=lambda _=None:scheduler.update_structure( self.v_replicat.get(),
+            command=lambda _=None:self.app.library.scheduler.update_structure( self.v_replicat.get(),
             [value for key,value in self.memory.items() if len(key.split('|')) ==1 and key !='']) )
         self.b_apply.pack(side=LEFT)
         self.b_reset = Button(self.f_buttons, text="Reset", command=self.reset_all)
@@ -451,7 +456,7 @@ class EasySchedulerPanel(Panel):
         self.e_max_ratio.grid(row=0, column=1)
         
         self.v_replicat = IntVar()
-        self.v_replicat.set( scheduler.replicat )
+        self.v_replicat.set( self.app.library.scheduler.replicat if self.app.library else 2 )
         self.e_replicat = Entry(self.f_general, textvariable=self.v_replicat)
         self.l_replicat = Label(self.f_general, text="replicat")
         self.l_replicat.grid(row=1, column=0)
@@ -464,12 +469,14 @@ class EasySchedulerPanel(Panel):
         self.f_pgs = Frame(self)
         self.f_pgs.pack()
         self.tree = ttk.Treeview(self.f_pgs, columns=('aeskey', 'crypt', 
-        'max_capacity', 'speed', 'path'))
+        'max_capacity', 'speed', 'path', 'login', 'pwd'))
         self.tree.heading('aeskey', text='AESkey')
         self.tree.heading('crypt', text='Crypt')
         self.tree.heading('max_capacity', text='Capacity')
         self.tree.heading('speed', text='Speed')
         self.tree.heading('path', text='Path')
+        self.tree.heading('login', text='Login')
+        self.tree.heading('pwd', text='Pwd')
 
         self.tree.grid(row=0, column=0)
         self.tree.grid(row=0, column=0)
@@ -538,6 +545,18 @@ class EasySchedulerPanel(Panel):
         self.e_area_path = Entry(self._bucket_area, textvariable=self.v_area_path)
         self.e_area_path.grid(row=5, column=1)
  
+        self.l_area_login = Label(self._bucket_area, text="Login")
+        self.l_area_login.grid(row=6, column=0)
+        self.v_area_login = StringVar()
+        self.e_area_login = Entry(self._bucket_area, textvariable=self.v_area_login)
+        self.e_area_login.grid(row=6, column=1)
+ 
+        self.l_area_pwd = Label(self._bucket_area, text="Pwd")
+        self.l_area_pwd.grid(row=7, column=0)
+        self.v_area_pwd = StringVar()
+        self.e_area_pwd = Entry(self._bucket_area, textvariable=self.v_area_pwd)
+        self.e_area_pwd.grid(row=7, column=1)
+ 
         self.b_area_process = Button(self.f_area, text="Process")
         self.b_area_process.pack()
     
@@ -547,14 +566,16 @@ class EasySchedulerPanel(Panel):
         
         global max_ratio
         self.v_max_ratio.set( max_ratio )
-        self.v_replicat.set( scheduler.replicat )
+        self.v_replicat.set( self.app.library.scheduler.replicat )
         
-        print(max_ratio)
         self.make_tree()
     
     def make_tree(self):
+        if not self.app.library:
+            return
+            
         self.memory[''] = None
-        for pg in scheduler.pgs:
+        for pg in self.app.library.scheduler.abstractScheduler.pgs:
             self.tree.insert( "", 'end',  pg.name , text=pg.name)
             self.memory[ pg.name ] = copy.deepcopy(pg)
             for pool in pg.children:
@@ -565,18 +586,21 @@ class EasySchedulerPanel(Panel):
                     self.tree.insert( pool.name, 'end',  bucket.name ,
                         text=bucket.name.split('|')[-1],
                         values=[bucket.aeskey, bucket.crypt, 
-                        bucket.max_capacity, bucket.speed, bucket.path])
+                        bucket.max_capacity, bucket.speed, bucket.path, 
+                        bucket.login, bucket.pwd])
                     self.memory[ bucket.name ] = copy.deepcopy(bucket)
             
     def build_add(self, parent_id):
-        self.b_area_process.configure(command= lambda _=None:self.process_add(parent_ids))
+        self.b_area_process.configure(command= lambda _=None:self.process_add(parent_id))
         parent = self.memory[parent_id]
-        if len(name.split('|')) == 3: #bucket
+        if len(parent.name.split('|')) == 2: #parent is pool
             self.v_area_aeskey.set("")
             self.v_area_crypt.set(False)
             self.v_area_max_capacity.set(0)
             self.v_area_speed.set(1.0)
             self.v_area_path.set("")
+            self.v_area_login.set("")
+            self.v_area_pwd.set("")
             
             self.f_area.pack()
             self._bucket_area.pack()
@@ -597,6 +621,8 @@ class EasySchedulerPanel(Panel):
             self.v_area_max_capacity.set(current.max_capacity)
             self.v_area_speed.set(current.speed)
             self.v_area_path.set(current.path)
+            self.v_area_login.set(current.login)
+            self.v_area_pwd.set(current.pwd)
             
             self.f_area.pack()
             self._bucket_area.pack()
@@ -614,21 +640,25 @@ class EasySchedulerPanel(Panel):
             self.memory[name] = Pool(name)
             self.memory[parent_name].add( self.memory[name] )
         else: #bucket
-            self.memory[parent_name].add( self.memory[name] )
-            self.memory[name]=Bucket(name=name, 
+            self.memory[name]=Bucket(
+                lib_name=self.app.library.name,
+                name=name, 
                 aeskey=self.v_area_aeskey.get(),
                 crypt=self.v_area_crypt.get(),
                 max_capacity=self.v_area_max_capacity.get(),
                 path=self.v_area_path.get(),
-                speed=self.v_area_speed.get()
+                speed=self.v_area_speed.get(),
+                login=self.v_area_login.get(),
+                pwd=self.v_area_pwd.get(),
                 )
-        
+            self.memory[parent_name].add( self.memory[name] )
+            
             values = [self.v_area_aeskey.get(), self.v_area_crypt.get(),
             self.v_area_max_capacity.get(), self.v_area_speed.get(), 
-            self.v_area_path.get()]
+            self.v_area_path.get(), self.v_area_login.get(), self.v_area_pwd.get()]
             
-        self.tree.insert( parent_name, 'end',  name.split('|')[-1], 
-            text=name, values=values)
+        self.tree.insert( parent_name, 'end',  name, 
+            text=name.split('|')[-1], values=values)
         self.f_area.pack_forget()
            
     def process_update(self, current_id):
@@ -654,7 +684,9 @@ class EasySchedulerPanel(Panel):
                 crypt=self.v_area_crypt.get(),
                 max_capacity=self.v_area_max_capacity.get(),
                 path=self.v_area_path.get(),
-                speed=self.v_area_speed.get()
+                speed=self.v_area_speed.get(),
+                login=self.v_area_login.get(),
+                pwd=self.v_area_pwd.get(),
                 )
             self.memory[parent_id].add( self.memory[current_id] )
             
@@ -665,11 +697,12 @@ class EasySchedulerPanel(Panel):
             self.tree.set( current_id, 'max_capacity', self.v_area_max_capacity.get())
             self.tree.set( current_id, 'speed', self.v_area_speed.get())
             self.tree.set( current_id, 'path', self.v_area_path.get())
+            self.tree.set( current_id, 'login', self.v_area_login.get())
+            self.tree.set( current_id, 'pwd', self.v_area_pwd.get())
             self.f_area.pack_forget()
         
         self.f_area.pack_forget()
 
-        
     def refresh(self):
         pass
             
@@ -677,12 +710,14 @@ class EasySchedulerPanel(Panel):
         pass
             
     def set(self):  
-        pass     
+        self.make_tree()     
         
 
 class DisplayPanel(Panel):
     def __init__(self, app, master, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
+        
+        self.app = app
         
         self.data = None
         self.obj = None
@@ -709,8 +744,12 @@ class DisplayPanel(Panel):
         if obj.md5 in files_cache:
             offset_width, offset_height, self.data = files_cache[obj.thumbnail]
         else:
-            im=Image.open( scheduler.get_file( obj.md5) )
-            
+            afile = self.app.library.scheduler.get_file( obj.md5)
+            if afile:
+                im=Image.open(afile)
+            else:
+                im=Image.open(location_file_default)
+                
             width, height = im.size
             ratio = float(width)/float(height)
             if float(width)/float(DISPLAY_WIDTH) < float(height)/float(DISPLAY_HEIGHT):
@@ -745,8 +784,8 @@ class MainPanel(Panel):
         self.centers = {
             "pagination" : PaginationPanel(app, self, num_x, num_y, height=500),
             "display" : DisplayPanel(app, self),
-            "scheduler": SchedulerPanel(app, self),
-            "easy_scheduler": EasySchedulerPanel(app, self),
+            "self.app.library.scheduler": SchedulerPanel(app, self),
+            "easy_self.app.library.scheduler": EasySchedulerPanel(app, self),
         }
         
         for panel in self.centers.values() :
@@ -804,10 +843,10 @@ class MainPanel(Panel):
         self.bottomPanel.hide()
         self.topPanel.hide()
         
-        if self.centerPanel != self.centers["scheduler"]:
+        if self.centerPanel != self.centers["self.app.library.scheduler"]:
             self.centerPanel.hide()
         
-        self.centerPanel = self.centers["scheduler"]
+        self.centerPanel = self.centers["self.app.library.scheduler"]
         self.centerPanel.set()
         self.centerPanel.show()
         
@@ -815,10 +854,10 @@ class MainPanel(Panel):
         self.bottomPanel.hide()
         self.topPanel.hide()
         
-        if self.centerPanel != self.centers["easy_scheduler"]:
+        if self.centerPanel != self.centers["easy_self.app.library.scheduler"]:
             self.centerPanel.hide()
             
-        self.centerPanel = self.centers["easy_scheduler"]
+        self.centerPanel = self.centers["easy_self.app.library.scheduler"]
         self.centerPanel.set()
         self.centerPanel.show()
         

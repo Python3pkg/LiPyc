@@ -219,7 +219,7 @@ class RightPanel(Panel):
             obj.filename,
             "Height : %d" % obj.metadata.height,
             "Width : %d" % obj.metadata.width,
-            "Datetime : %s" % time.strftime( "%Y-%d-%m", obj.metadata.datetime)
+            "Datetime : %s" % time.strftime( "%Y-%d-%m", time.gmtime(obj.metadata.datetime))
         ])
         
         def _remove():
@@ -240,7 +240,7 @@ class RightPanel(Panel):
                 obj.filename,
                 "Height : %d" % obj.metadata.height,
                 "Width : %d" % obj.metadata.width,
-                "Datetime : %s" % time.strftime( "%Y-%d-%m", obj.metadata.datetime)
+                "Datetime : %s" % time.strftime( "%Y-%d-%m", time.gmtime(obj.metadata.datetime))
             ]
             buttons_texts = ["Remove"]
             callbacks = [
@@ -251,7 +251,7 @@ class RightPanel(Panel):
                 obj.name,
                 "Subalbums : %d" % len(obj.subalbums),
                 "Files : %d" % len(obj.files),
-                "Datetime : %s" % time.strftime( "%Y-%d-%m", obj.datetime)
+                "Datetime : %s" % time.strftime( "%Y-%d-%m", time.gmtime(obj.datetime))
             ]
             buttons_texts=["Set cover", "Rename", "Remove"]
 

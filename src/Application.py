@@ -39,7 +39,6 @@ from lipyc.Album import Album
 from lipyc.File import File
 from lipyc.config import *
 from lipyc.autologin import *
-from lipyc.scheduler import scheduler
 from lipyc.similarity import find_similarities
 
 #class Certificat(Enum):
@@ -94,28 +93,49 @@ class Application(Tk, WorkflowStep):
         
         with open( "general.data", 'rb') as f:
             general = pickle.load(f)
-
-            if general :
+            files, albums = {}, {}
+            
+            if general:
                 if general["library_location"] and os.path.isdir( general["library_location"] ):
-                    self.library = Library(general["library_location"])
+                    self.library = Library(general["library_name"], general["library_location"])
+                    files, albums = self.library.load()
                     self.rightPanel.actionPanel.set()
                     
-                self.parents_album = general["parents_album"]
+                self.parents_album.clear() 
+                if general["parents_album"]:
+                    for id_album in general["parents_album"].split('|'):
+                        self.parents_album.append(albums[int(id_album)])
+                #self.parents_album = general["parents_album"]
                 self.current = general["current"]
                 self.action = general["action"]
-                self.last_objs = general["last_objs"]
+                
+                self.last_objs = []
+                if general["last_objs"]:
+                    for data in general["last_objs"].split('|'):
+                        tmp=[]
+                        for row in data.split(';'):
+                            id_obj, isalbum = row.split('#')
+                            
+                            if isalbum == 'True':
+                                tmp.append(albums[int(id_obj)])
+                            else:
+                                tmp.append(files[int(id_obj)])
+                        self.last_objs.append( tmp )
                 
         
         self.refresh()
         
     def store(self):
         general={
-            'library_location' : self.library.location if self.library else None,
-            'parents_album' : self.parents_album,
+            'library_name' : self.library.name if self.library else '',
+            'library_location' : self.library.location if self.library else '',
+            'parents_album' : '|'.join([str(alb.id) for alb in self.parents_album]),
             'current' : self.current,
             'action' : self.action,
-            'last_objs':self.last_objs,
+            'last_objs': '|'.join([ ';'.join( [str(obj.id)+'#'+str(isinstance(obj, Album)) for obj in objs] ) 
+                for objs in self.last_objs]),
         }
+        
         with open("general.data", 'wb') as f:
             pickle.dump(general, f, pickle.HIGHEST_PROTOCOL)
       
@@ -124,8 +144,7 @@ class Application(Tk, WorkflowStep):
         for th in self.io_threads:
             if th.is_alive():
                 th.join()
-        
-        scheduler.store()
+                
         self.destroy()
 #### Async IO
     def save(self):
@@ -335,7 +354,9 @@ class Application(Tk, WorkflowStep):
         if not name :
             messagebox.showerror("Error", "Invalid name for album name")
 
-        album = Album( name )
+        global ressource_counter
+        ressource_counter +=1
+        album = Album(ressource_counter, self.library.scheduler, name )
         if self.parents_album :
             self.parents_album[-1].add_subalbum( album )
         else:
@@ -348,7 +369,6 @@ class Application(Tk, WorkflowStep):
     def show_files(self, current=0):
         self.current = current
         self.action = Action.pagination_files
-
         if self.parents_album :
             self.display_files( self.parents_album[-1].files)
         else:
@@ -387,10 +407,13 @@ class Application(Tk, WorkflowStep):
         if not location:
             return False
             
+        name = os.path.basename( location )
+            
         if not os.path.isdir( location ):
             messagebox.showerror("Error", "Library location : invalid")
         
-        self.library = Library( location )
+        self.library = Library( name, location )
+        self.library.load()
         
         self.parents_album.clear()
         self.selected.clear()
@@ -454,14 +477,14 @@ class Application(Tk, WorkflowStep):
             if isinstance(obj, Album):
                 parent_album.add_subalbum( obj )
             else:
-                parent_album.add_file( obj, self.library.location )
+                parent_album.add_file( obj )
                 
     def copy_to(self, parent_album):
         for obj in self.selected:
             if isinstance(obj, Album):
                 parent_album.add_subalbum( copy.deepcopy( obj ) )
             else:
-                parent_album.add_file( obj, self.library.location )
+                parent_album.add_file( obj )
         
     def move_to(self, parent_album):        
         for obj in list(self.selected):
@@ -469,7 +492,7 @@ class Application(Tk, WorkflowStep):
                 parent_album.add_subalbum( obj  )
                 self.remove_album( obj )
             else:
-                parent_album.add_file( obj, self.library.location )
+                parent_album.add_file( obj )
                 self.remove_file( obj )
         
 ###### End ActionPanel
@@ -516,9 +539,12 @@ class Application(Tk, WorkflowStep):
         album.set_thumbnail(location)
         
     def set_cover_from(self, album, _file):
-        if album:
-            album.set_thumbnail( scheduler.get_file(_file.md5) )
-        
+        print('efe', album)
+        if isinstance(album, Album):
+            print('coucou')
+            album.set_thumbnail( self.library.scheduler.get_file(_file.md5) )
+        else:
+            print("ard")
     def find_similarities_inside(self):#permet de reduire la complexité, on fait du On² sur des partitions
         if self.parents_album:
             files = self.parents_album[-1].deep_files()
@@ -636,18 +662,11 @@ class Application(Tk, WorkflowStep):
         with open("pgs.json", "w") as fp:
             fp.write(data)
             
-        scheduler.parse()
+        self.library.scheduler.parse()
     
     def quick_restore_files(self):
         for th in self.io_threads:
             if th.is_alive():
                 th.join()
         
-        scheduler.quick_restore()
-    
-    def full_restore_files(self):
-        for th in self.io_threads:
-            if th.is_alive():
-                th.join()
-                
-        scheduler.full_restore()
+        self.library.scheduler.quick_restore()

@@ -28,8 +28,8 @@ class TopMenu(Menu):
     
     def make(self):
         self.make_file()
-        self.make_import()
-        self.make_export()
+        #self.make_import()
+        #self.make_export()
         self.make_functions()
         self.make_utilities()
         self.make_preferences()
@@ -37,21 +37,24 @@ class TopMenu(Menu):
     def make_file(self):
         m_file = Menu(self, tearoff=0)
         m_file.add_command(label="Open", command= self.app.set_library_location)
-        m_file.add_command(label="Save lib", command= self.app.save_library)
+        m_file.add_command(label="Save", command= self.app.save_library)
+        m_file.add_separator()
+        m_file.add_command(label="Import dir(rec)", command= self.app.import_directory)
+        m_file.add_command(label="Export to", command= self.app.export_to)
         m_file.add_separator()
         m_file.add_command(label="Quit", command= self.master.quit)
-        self.add_cascade(label="File", menu=m_file)
+        self.add_cascade(label="Library", menu=m_file)
     
-    def make_import(self):
-        m_import = Menu(self, tearoff=0)
-        m_import.add_command(label="Directory(recursif)", command= self.app.import_directory)
-        self.add_cascade(label="Import", menu=m_import)
+    #def make_import(self):
+        #m_import = Menu(self, tearoff=0)
+        #m_import.add_command(label="Directory(recursif)", command= self.app.import_directory)
+        #self.add_cascade(label="Import", menu=m_import)
 
-    def make_export(self):
-        m_export = Menu(self, tearoff=0)
-        m_export.add_command(label="Export to", command= self.app.export_to)
-        #m_export.add_command(label="Export lib to", command= self.app.export_lib_to)
-        self.add_cascade(label="Export", menu=m_export)
+    #def make_export(self):
+        #m_export = Menu(self, tearoff=0)
+        #m_export.add_command(label="Export to", command= self.app.export_to)
+        ##m_export.add_command(label="Export lib to", command= self.app.export_lib_to)
+        #self.add_cascade(label="Export", menu=m_export)
 
     def make_preferences(self):
         m_preferences = Menu(self, tearoff=0)
