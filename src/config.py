@@ -50,4 +50,3 @@ thumbnails={
 thumbnails_cache = ARCCache( 100 )
 files_cache = ARCCache( 20 )
 
-ressource_counter = 0 #used for global uniq id

@@ -66,6 +66,7 @@ class TopMenu(Menu):
     def make_utilities(self):
         m_utilities = Menu(self, tearoff=0)
         m_utilities.add_command(label="Restore files", command= self.app.quick_restore_files)
+        m_utilities.add_command(label="Reset storage", command= self.app.reset_storage)
         
         self.add_cascade(label="Uilities", menu=m_utilities)
 

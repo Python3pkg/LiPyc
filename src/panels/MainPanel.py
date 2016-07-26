@@ -326,7 +326,10 @@ class Tile(Panel):
                 self.data = ImageTk.PhotoImage( Image.open(afile))
                 thumbnails_cache[obj.thumbnail] = self.data
             else:
-                self.data = ImageTk.PhotoImage(Image.open(location_album_default))
+                if isinstance(obj, Album):
+                    self.data = ImageTk.PhotoImage(Image.open(location_album_default))
+                else:
+                    self.data = ImageTk.PhotoImage(Image.open(location_file_default))
         
         self.obj = obj
         self.version = obj.version()

@@ -33,7 +33,7 @@ class Album(Versionned): #subalbums not fully implemented
         self.datetime = datetime if datetime else time.mktime(time.gmtime())
         self.subalbums = set()
         
-        self.thumbnail = self.scheduler.add_file( **thumbnails["album"] )
+        self.thumbnail = None
         self.files = set() #order by id
         self.inner_keys = [] #use for inner albums
         
@@ -98,10 +98,11 @@ class Album(Versionned): #subalbums not fully implemented
         self.name = name
         
     def add_file(self, _file):
+        self.files.add(_file)
+
         if self.thumbnail == None and _file.thumbnail :
             self.thumbnail = self.scheduler.duplicate_file( _file.thumbnail )
 
-        self.files.add(_file)
         
     def remove_file(self, _file):
         self.files.discard(_file)       

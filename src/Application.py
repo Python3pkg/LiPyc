@@ -279,8 +279,6 @@ class Application(Tk, WorkflowStep):
         
         self.set_last_objs(self.current_pagination, albums)
         
-        #self.last_objs = albums
-        #print(albums)
         self.mainPanel.set_pagination(albums)
         self.leftPanel.set_pagination(albums)
         self.rightPanel.set_pagination(self.selected)
@@ -293,7 +291,6 @@ class Application(Tk, WorkflowStep):
         self.action = Action.pagination_files
         
         self.set_last_objs(self.current_pagination, files)
-        #self.last_objs = files
         
         self.mainPanel.set_pagination(files)
         self.leftPanel.set_pagination(files)
@@ -539,13 +536,15 @@ class Application(Tk, WorkflowStep):
         album.set_thumbnail(location)
         
     def set_cover_from(self, album, _file):
-        print('efe', album)
         if isinstance(album, Album):
-            print('coucou')
             album.set_thumbnail( self.library.scheduler.get_file(_file.md5) )
-        else:
-            print("ard")
+
     def find_similarities_inside(self):#permet de reduire la complexité, on fait du On² sur des partitions
+        if not self.library:
+            messagebox.showerror("Error", "No library openned") #on peutle faire avec un decorateur
+            return
+        
+        
         if self.parents_album:
             files = self.parents_album[-1].deep_files()
         else:
@@ -568,14 +567,14 @@ class Application(Tk, WorkflowStep):
                 
                 twins.add( f )
                 similarities.append( twins )
-        #print("Report similarities %d" % len(similarities))
+
         if similarities:
             self.current = 0
             self.current_pagination = 0
             self.last_objs=[[]]
             for k,twins in enumerate(similarities):
                 self.set_last_objs(k, twins)
-            #self.display_similarities(similarities[0])
+
             self.action = Action.pagination_similarities
             self.refresh()
 
@@ -608,7 +607,6 @@ class Application(Tk, WorkflowStep):
         if not auto :
             self.mainPanel.reset()
         self._refresh()
-        #print("Refresh duration %f",  default_timer()-s)
    
     def remove_file(self, _file, refresh=False):#surtout pas de thread io
         self.parents_album[-1].remove_file( _file )
@@ -641,6 +639,9 @@ class Application(Tk, WorkflowStep):
         self.refresh()
 
     def easy_configure_pgs(self):
+        if not self.library:
+            messagebox.showerror("Error", "No library openned")
+            return
         self.action = Action.easy_configure_pgs
         
         self.rightPanel.hide()
@@ -650,6 +651,9 @@ class Application(Tk, WorkflowStep):
         self.mainPanel.grid(row=0, column=1)
         
     def configure_pgs(self):
+        if not self.library:
+            messagebox.showerror("Error", "No library openned")
+            return
         self.action = Action.configure_pgs
         
         self.rightPanel.hide()
@@ -659,14 +663,35 @@ class Application(Tk, WorkflowStep):
         self.mainPanel.grid(row=0, column=1)
         
     def save_pgs(self, data):
+        if not self.library:
+            messagebox.showerror("Error", "No library openned")
+            return 
+            
         with open("pgs.json", "w") as fp:
             fp.write(data)
             
         self.library.scheduler.parse()
     
     def quick_restore_files(self):
+        if not self.library:
+            messagebox.showerror("Error", "No library openned")
+            return 
+            
         for th in self.io_threads:
             if th.is_alive():
                 th.join()
         
         self.library.scheduler.quick_restore()
+    
+    def reset_storage(self):
+        for th in self.io_threads:
+            if th.is_alive():
+                th.join()
+                
+        if os.path.exists('general.data'):
+            os.remove('general.data')
+
+        if self.library:
+            self.library.reset_storage()
+            
+        self.destroy()

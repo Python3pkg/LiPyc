@@ -31,7 +31,7 @@ counter = 0
 class InnerScheduler(Thread):
     ##
     # lib_name - uniq id, used lib name for instance
-    def __init__(self, lib_name, id_client, abstractScheduler, Exit):
+    def __init__(self, lib_name, id_client, abstractScheduler, Exit, path):
         super().__init__()
 
         self.id_client = id_client
@@ -40,6 +40,8 @@ class InnerScheduler(Thread):
         self.abstractScheduler = abstractScheduler
         
         self.Exit = Exit
+        self.loading = True
+        self.path = path
         
         self.transaction_lock = Lock()
         
@@ -49,28 +51,32 @@ class InnerScheduler(Thread):
         self.transactions = []
         self.applied_transactions = set()
         self.incomming_transactions = []
-     
+             
+    def location_of(self, filename):
+        return os.path.join(self.path, filename)
+        
+    def isfile(self, filename):
+        return os.path.isfile( self.location_of(filename) )
+        
     def add(self, row):#thread-safe because deque is
         self.in_pipe.append(row)
         
-    def apply(self, transactions):
-        for transaction in transactions:  
-            if transaction.id() in self.applied_transactions:
+    def apply(self, transactions, duration):
+        origin = time()
+        transactions = deque(transactions)
+        
+        while transactions and origin + duration > time(): 
+            transaction = transactions.popleft()
+            if transaction.id() in self.applied_transactions or not transaction.data:
                 continue
-                
+
+            self.applied_transactions.add(transaction.id())
+
             for tmp in transaction.data:
                 t,row = tmp[0], tmp[1:]
                 if t == 'added':
                     fp, md5, size = row
-                    
-                    if fp and not md5 in self.abstractScheduler.files:
-                        print("saving")
-                        self.abstractScheduler.add_file( fp, md5, size)
-                    else:
-                        if md5 in self.abstractScheduler.files:
-                            self.abstractScheduler.duplicate_file(md5)
-                        else:#conflit with an extern transaction( the previous one has won
-                            pass
+                    self.abstractScheduler.add_file( fp, md5, size)
                 elif t == 'removed':
                     _, md5, _ = row
 
@@ -79,13 +85,15 @@ class InnerScheduler(Thread):
                     replicat, struct = row
                     
                     self.abstractScheduler.update_structure(replicat, struct)
-            self.applied_transactions.add(transaction.id())
+
+            for bucket in self.abstractScheduler.buckets():
+                transaction.save(os.path.join(bucket.path, 'transactions'))
             
         transactions.clear()
             
     def check_incomming_transactions(self):
         transactions = set()
-        buckets = self.abstractScheduler.buckets()
+        buckets = self.abstractScheduler.buckets() #peut être access(0)??,
         replicat = self.abstractScheduler.replicat
         for bucket,_ in zip(buckets, range(replicat)):
             for tr in bucket.transactions():
@@ -112,6 +120,10 @@ class InnerScheduler(Thread):
         
         return True
         
+    def unlock_all(self):
+        for bucket in self.abstractScheduler.buckets():
+            bucket.unlock()
+    
     def process(self):
         if not self.transaction:
             self.transaction = Transaction(self.id_client, self.lib_name)
@@ -125,14 +137,40 @@ class InnerScheduler(Thread):
             self.transaction.add(self.in_pipe.popleft())
             
         self.check_incomming_transactions()
-        self.apply(self.incomming_transactions)
+        self.apply(self.incomming_transactions, 120/2)
         
         if self.transactions and self.lock_all():
             self.check_incomming_transactions()
-            self.apply(self.incomming_transactions)
+            self.apply(self.incomming_transactions, 120/2)
+            
+            self.apply(self.transactions, 120/2)
+            self.unlock_all()
+   
+    def store(self):
+        if not self.applied_transactions:
+            return 
+        with open(self.location_of("applied_transactions.json"), "w") as f :
+            json.dump(list(self.applied_transactions), f)   
+
+    def load(self):
+        if not self.isfile("applied_transactions.json"):
+            return
+            
+        with open(self.location_of("applied_transactions.json"), "r") as f :
+            self.applied_transactions = set(json.load(f))
+   
+    def reset_storage(self):
+        if self.isfile('applied_transactions.json'):
+            os.remove(self.location_of('applied_transactions.json'))
+   
+    def quick_restore(self):
+        self.check_incomming_transactions()
+        self.apply( self.incomming_transactions, 2**32 )
         
-            self.apply(self.transactions)
     def run(self):
+        if self.loading:
+            self.load()
+        
         while not self.Exit.is_set():
             self.process()
             sleep(1)
@@ -140,3 +178,5 @@ class InnerScheduler(Thread):
         while self.in_pipe:
             self.process()
             sleep(1)
+        
+        self.store()

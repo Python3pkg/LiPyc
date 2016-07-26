@@ -38,7 +38,9 @@ class Library(WorkflowStep):
         
         self.name = name
         self.location = location
-        self.scheduler=Scheduler(name)
+        self.scheduler=Scheduler(name, self.location)
+        
+        self.ressource_counter = 0
         
     def __str__(self):
         return ""
@@ -64,6 +66,8 @@ class Library(WorkflowStep):
         
         self.albums = db.build_first_layer_albums(albums)
         self.inner_albums = db.build_inner_albums(albums)
+        
+        self.ressource_counter = db.init_counter()
         db.close()
 
         return (files, albums)
@@ -100,19 +104,17 @@ class Library(WorkflowStep):
         if afile.md5 in self.scheduler : #dedup des objs python
             return True
         
-        global ressource_counter
-        ressource_counter +=1
-        
+        self.ressource_counter +=1
         afile.extract(file_location)
         afile.create_thumbnails(file_location) 
         afile.store(file_location)
         
         year, month =  (afile.metadata.year, afile.metadata.month)
-        
+
         if (year, month) not in self.inner_albums:
             if year not in self.inner_albums:
-                y_album = Album(ressource_counter, self.scheduler, year )
-                ressource_counter+=1
+                y_album = Album(self.ressource_counter, self.scheduler, year )
+                self.ressource_counter+=1
                 
                 y_album.inner_keys = [year]
                 self.inner_albums[ year ] = y_album
@@ -121,7 +123,7 @@ class Library(WorkflowStep):
                 y_album = self.inner_albums[ year ]
             
             
-            m_album = Album(ressource_counter, self.scheduler, month )
+            m_album = Album(self.ressource_counter, self.scheduler, month )
             m_album.inner_keys = [y_album.inner_keys[0], month]
             y_album.add_subalbum( m_album )
 
@@ -139,14 +141,13 @@ class Library(WorkflowStep):
         
     #don io_protect this
     def inner_add_directory(self, location):
-        global ressource_counter
         for path, dirs, files in os.walk(location):
             for filename in files:
                 if check_ext(filename) :  
                     file_location = os.path.join(path, filename)
-                    ressource_counter+=1
+                    self.ressource_counter+=1
                     
-                    self.add_file( File(ressource_counter, self.scheduler, 
+                    self.add_file( File(self.ressource_counter, self.scheduler, 
                     lipyc.crypto.md5( file_location ), filename), file_location)
             
     @io_protect()
@@ -170,3 +171,7 @@ class Library(WorkflowStep):
         return itertools.chain.from_iterable(map(Album.deep_files, self.albums))
 
  
+    def reset_storage(self):
+        if os.path.exists(os.path.join(self.location, 'metadata.db')):
+            os.remove( os.path.join(self.location, 'metadata.db') )
+        self.scheduler.reset_storage()

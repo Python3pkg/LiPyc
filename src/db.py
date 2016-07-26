@@ -4,18 +4,20 @@ from datetime import datetime
 
 from lipyc.Album import Album
 from lipyc.File import File, FileMetadata
+from lipyc.config import *
 
 class DBFactory:
     def __init__(self, path):
         self.path = path
-    
+        self.ressource_counter = 0 #used for global uniq id
+
         if not os.path.isfile( os.path.join(path, 'metadata.db')) :
             self.conn = self.connect()
             self.create_tables()
         else:
             self.conn = self.connect()
         
-        
+        self.init_counter()
     
     def __del__(self):
         self.conn.close()
@@ -27,8 +29,6 @@ class DBFactory:
         return sqlite3.connect(os.path.join(self.path, 'metadata.db'))
     
     def create_tables(self):
-        print("creating tables")
-        print()
         with self.conn:
             self.conn.execute('''CREATE TABLE albums 
             (id, name, datetime, subalbums, thumbails, files, inner_keys, PRIMARY KEY (`id`))''')
@@ -43,8 +43,21 @@ class DBFactory:
             
             self.conn.execute('''CREATE TABLE file_metadata (id_file, datetime, year, month, 
             width, height, size, PRIMARY KEY (`id_file`))''')
-        print("tables created")
     
+    def init_counter(self):
+        ressource_counter = 0
+        with self.conn:
+            for row  in self.conn.execute('''SELECT MAX(albums.id), 
+            MAX(files.id) FROM albums, files'''):
+
+                if row[0] and row[1]:
+                    ressource_counter = max(int(row[0]), int(row[1]))+1
+                elif row[0]:
+                    ressource_counter = int(row[0])+1
+                elif row[1]:
+                    ressource_counter = int(row[1])+1
+        return ressource_counter
+            
     def save_albums(self, albums):
         data = [ album.sql() for album in albums]
         
@@ -54,7 +67,7 @@ class DBFactory:
            
     def save_first_layer_albums(self, albums):
         data = [(album.id,) for album in albums]
-        
+
         with self.conn:
             self.conn.executemany('''INSERT OR REPLACE INTO first_layer_albums 
             (id_album) VALUES (?)''', data)
@@ -78,8 +91,8 @@ class DBFactory:
         self.save_file_metadata( [afile.metadata for afile in files] )
     
     def save_inner_albums(self, inner_albums):
-        data = [ ('|'.join(key), alb.id) for key, alb in inner_albums.items() ]
-      
+        data = [ ('|'.join(key) if not isinstance(key, str) else key, alb.id) for key, alb in inner_albums.items() ]
+
         with self.conn:
             self.conn.executemany('''INSERT OR REPLACE INTO inner_albums 
             (key, id_album) VALUES (?,?) ''', data)
@@ -157,6 +170,10 @@ class DBFactory:
         
         with self.conn:
             for row in self.conn.execute('SELECT * FROM inner_albums'):
-                inner_albums[tuple(row[0].split('|'))] = albums[int(row[1])]
-        
+                tmp = row[0].split('|')
+                if len(tmp) == 1:
+                    inner_albums[tmp[0]] = albums[int(row[1])]
+                else:
+                    inner_albums[tuple(tmp)] = albums[int(row[1])]
+
         return inner_albums

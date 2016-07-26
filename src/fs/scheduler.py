@@ -27,11 +27,13 @@ delay_snapshot = 100#nombre d'operations entre deux snapshots
 class Scheduler:
     ##
     # lib_name - uniq id, used lib name for instance
-    def __init__(self, lib_name, replicat=2):
+    def __init__(self, lib_name, path):
         self.Exit = Event()
+        self.lib_name = lib_name
         self.id_client = random()
-        self.abstractScheduler = AbstractScheduler(lib_name, self.id_client, replicat)
-        self.innerScheduler = InnerScheduler(lib_name, self.id_client, self.abstractScheduler, self.Exit)
+        self.path = path
+        self.abstractScheduler = AbstractScheduler(lib_name, self.id_client, default_replicat, path)
+        self.innerScheduler = InnerScheduler(lib_name, self.id_client, self.abstractScheduler, self.Exit, path)
         #self.files = set()
         
         self.innerScheduler.start()
@@ -61,9 +63,6 @@ class Scheduler:
         return md5 in self.abstractScheduler.files
      
     def duplicate_file(self, md5):
-        if not md5 in self.fabstractScheduler.files:
-            raise Exception("Scheduler, file can not be duplicated because it does not exist")
-        
         self.innerScheduler.add( ('added', None, md5, 0) )
 
         return md5
@@ -95,9 +94,8 @@ class Scheduler:
         self.Exit.set()
         while self.innerScheduler.is_alive():
             sleep(1)
-            
+
         self.abstractScheduler.store()
-        print("Warning, scheduler can store only once")
         
     def info(self):        
         return self.abstractScheduler.info()
@@ -105,8 +103,31 @@ class Scheduler:
     
     #peut être qu'on peut réutiliser les transactions
     def quick_restore(self):#be carfull must be used at the start of the application
-        self.abstractScheduler.quick_restore()
+        if self.innerScheduler.is_alive():
+            self.Exit.set()
+            
+        while self.innerScheduler.is_alive():
+            sleep(1)
+            
+        self.innerScheduler.reset_storage()
+        self.Exit.clear()
+        
+        self.innerScheduler = InnerScheduler(self.lib_name, self.id_client, self.abstractScheduler, self.Exit, self.path)
+        self.innerScheduler.quick_restore()
+        self.loading = False
+        self.innerScheduler.start()
+        #self.abstractScheduler.quick_restore()
         
         #self.files.clear()
         #for key in self.abstractScheduler.files:
             #self.files.add(key)
+
+    def reset_storage(self):        
+        if self.innerScheduler.is_alive():
+            self.Exit.set()
+            
+        while self.innerScheduler.is_alive():
+            sleep(1)
+            
+        self.innerScheduler.reset_storage()
+        self.abstractScheduler.reset_storage()

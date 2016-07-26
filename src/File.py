@@ -42,7 +42,6 @@ class FileMetadata:
         self.width, self.height, self.size) 
     
     def __deepcopy__(self, memo, new_parent=None):
-        print('copy file')
         new = FileMetadata(new_parent if new_parent else self.parent)    
         new.datetime  = copy.deepcopy( self.datetime )
         new.year = copy.deepcopy( self.year )

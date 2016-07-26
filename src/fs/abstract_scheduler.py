@@ -29,7 +29,7 @@ from lipyc.fs.utility import *
 class AbstractScheduler(Container):
     ##
     # lib_name - uniq id, used lib name for instance
-    def __init__(self, lib_name, id_client, replicat):
+    def __init__(self, lib_name, id_client, replicat, path):
         super().__init__()
         self.lib_name = lib_name
         self.id_client  = id_client
@@ -37,18 +37,20 @@ class AbstractScheduler(Container):
         self.pgs = self.children
         self.replicat = replicat
         
+        self.path = path
+        
         self.files = {} #ensemble des fichiers gérés : md5 => size, number(nombre de creation)
             
-        self.history = []#must be locked by_dblock
+        #self.history = []#must be locked by_dblock
         self.previous_snapshot = 0
 
-    def snapshot(self): #should be called in db_lock mod
-        if delay_snapshot <= len(self.history) and self.previous_snapshot<time():
-            t= time()
-            with open("snapshot-%d.json" % t, "w") as f :
-                json.dump(self.history, f)
-                self.history.clear()
-            self.previous_snapshot = t
+    #def snapshot(self): #should be called in db_lock mod
+        #if delay_snapshot <= len(self.history) and self.previous_snapshot<time():
+            #t= time()
+            #with open("snapshot-%d.json" % t, "w") as f :
+                #json.dump(self.history, f)
+                #self.history.clear()
+            #self.previous_snapshot = t
         
     def prune(self):
         for pg in self.pgs :
@@ -81,13 +83,13 @@ class AbstractScheduler(Container):
         return buckets[-1] 
         
     def add_file(self, fp, md5, size ): #current location of the file, fp location or file descriptor
-        self.snapshot()
+        #self.snapshot()
         if md5 in self.files: #deduplication ici
             self.files[md5][1]+=1
-            self.history.append( ('update',md5, self.files[md5][1]) )
+            #self.history.append( ('update',md5, self.files[md5][1]) )
             return md5
-        else:
-            self.history.append( ('added', md5, size) )
+        #else:
+            #self.history.append( ('added', md5, size) )
                 
 
         key = int(md5, 16)
@@ -98,23 +100,24 @@ class AbstractScheduler(Container):
         counter+=1
 
         self.files[md5] = [size,1]
-        self.history.append( ('added', md5, size) )
-        fp.close()
+        #self.history.append( ('added', md5, size) )
+        if fp:
+            fp.close()
         
         return md5
             
     def __contains__(self, md5):
         return md5 in self.files
      
-    def duplicate_file(self, md5):
-        self.snapshot()
-        self.files[md5][1]+=1
-        self.history.append( ('update', md5, self.files[md5][1]) )
+    #def duplicate_file(self, md5):
+        #self.snapshot()
+        #self.files[md5][1]+=1
+        #self.history.append( ('update', md5, self.files[md5][1]) )
 
-        return md5
+        #return md5
         
     def remove_file(self, md5):
-        self.snapshot()   
+        #self.snapshot()   
         if md5 not in self.files:
             return
             
@@ -128,7 +131,7 @@ class AbstractScheduler(Container):
             
         del self.files[md5]
         
-        self.history.append( ('removed', md5, None) )
+        #self.history.append( ('removed', md5, None) )
 
     def get_file(self, md5):
         if md5 not in self.files:
@@ -176,11 +179,17 @@ class AbstractScheduler(Container):
     def __str__(self):
         return str(self.pgs)  
         
+    def location_of(self, filename):
+        return os.path.join(self.path, filename)
+        
+    def isfile(self, filename):
+        return os.path.isfile( self.location_of(filename) )
+    
     def parse(self):
-        if not os.path.isfile("pgs.json"):
-            return False
+        if not self.isfile("pgs.json"):
+            shutil.copy2(location_pgs_default, self.location_of('pgs.json'))
             
-        with open("pgs.json", "r") as fp: #il faut preserver les ids sinon on ne retrouvera plus les fichiers
+        with open(self.location_of("pgs.json"), "r") as fp: #il faut preserver les ids sinon on ne retrouvera plus les fichiers
             config = json.load(fp)
 
             global max_ratio#a modifier
@@ -195,40 +204,74 @@ class AbstractScheduler(Container):
                 tmp = PG.make(self.lib_name, name, json_pg, aeskey)
                 self.add( tmp )
     
-    def load(self):
-        if os.path.isfile("scheduler.data"):
-            with open( "scheduler.data", 'rb') as f:
-                data = pickle.load(f)
-                self.pgs.update(data["pgs"] )
-                self.replicat = data["replicat"]
-        else:
-            self.parse()
+    def pgs2json(self):
+        data = {}
         
-        if os.path.isfile("files.json"):
-            with open("files.json", "r") as f :
+        global max_ratio
+        data['max_ratio'] = max_ratio
+        data['replicat'] = self.replicat
+        data['aeskey'] = ''
+        data['pgs'] = {}
+        
+        for pg in self.pgs: 
+            tmp = {'aeskey':'', 'pools':{}}         
+            for pool in pg.children:
+                tmp2 = {'buckets':{}, 'aeskey':''}
+                for bucket in pool.children:
+                    tmp3 = {
+                        'path':bucket.path,
+                        'max_capacity':bucket.max_capacity,
+                        'speed':bucket.speed,
+                        'crypt':bucket.crypt,
+                        'aeskey':bucket.aeskey,
+                        'login':bucket.login,
+                        'pwd':bucket.pwd
+                    }
+                    tmp2['buckets'][bucket.name.split('|')[-1]] = tmp3
+                tmp['pools'][pool.name.split('|')[-1]] = tmp2
+            data['pgs'][pg.name] = tmp
+        
+        return data
+        
+    def load(self):
+        self.parse()
+
+        if self.isfile("files.json"):
+            with open(self.location_of("files.json"), "r") as f :
                 self.files = json.load(f)
         
     def store(self):
-        print("Storing scheduler")
-        with open("files.json", "w") as f :
+        with open(self.location_of("files.json"), "w") as f :
             json.dump(self.files, f)
-        print("saved replicat", self.replicat)
-        with open("scheduler.data", 'wb') as f:
-            data={
-                'pgs':self.pgs,
-                'files':self.files,
-                'replicat':self.replicat
-            }
-            
-            pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
         
-        self.snapshot()
-        global delay_snapshot
-        delay_snapshot = 1
-        self.snapshot()
+        with open(self.location_of("pgs.json"), "w") as f :
+            json.dump(self.pgs2json(), f)
+             
+        #with open(self.location_of("scheduler.data"), 'wb') as f:
+            #data={
+                #'pgs':self.pgs,
+                #'files':self.files,
+                #'replicat':self.replicat
+            #}
+            
+            #pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
+        
+        #self.snapshot()
+        #global delay_snapshot
+        #delay_snapshot = 1
+        #self.snapshot()
+    
+    def reset_storage(self):
+        if self.isfile('files.json'):
+            os.remove(self.location_of('files.json'))
+        if self.isfile('pgs.json'):
+            os.remove(self.location_of('pgs.json'))
+        
+        for b in self.buckets():
+            b.reset_storage()
     
     def info(self):        
-        measurement_unit = 1024*1024#calcul exacte par raport à l'unité choisie(heuristic....)
+        measurement_unit = 8*1024*1024#calcul exacte par raport à l'unité choisie(heuristic....)
 
         
         mc = int(sum( [int(pg.max_capacity / measurement_unit) for pg in self.pgs])/self.replicat) 
@@ -250,42 +293,41 @@ class AbstractScheduler(Container):
     def buckets(self):
         return itertools.chain( *list(map( lambda x:x.buckets(), self.pgs )) )
 
-    def quick_restore(self):#be carfull must be used at the start of the application
-        self.clear()
-        self.history.clear()
-        begin = time() #faut supprimer tout les trucs créée entre temps
+    #def quick_restore(self):#be carfull must be used at the start of the application
+        #self.clear()
+        ##self.history.clear()
+        #begin = time() #faut supprimer tout les trucs créée entre temps
         
-        locations= []
-        for path, dirs, files in os.walk('.'):
-            for filename in files:
-                location = os.path.join(path, filename)
+        #locations= []
+        #for path, dirs, files in os.walk('.'):
+            #for filename in files:
+                #location = os.path.join(path, filename)
                 
-                if filename[:9] == 'snapshot-' and int(filename[9:-5])<begin :  
-                    locations.append(location)
+                #if filename[:9] == 'snapshot-' and int(filename[9:-5])<begin :  
+                    #locations.append(location)
         
-        for location in sorted(locations):
-            with open(location, "r") as f :
-                history = json.load(f)
+        #for location in sorted(locations):
+            #with open(location, "r") as f :
+                #history = json.load(f)
                 
-            for t, md5, v1 in history:
-                if t == 'added':
-                    self.add_file( None, md5, v1)
-                elif t == 'update' :
-                    for k in range(v1-self.files[md5][1]):
-                        self.duplicate_file(md5)
-                elif t == 'removed':
-                    self.remove_file(md5)
+            #for t, md5, v1 in history:
+                #if t == 'added':
+                    #self.add_file( None, md5, v1)
+                #elif t == 'update' :
+                    #for k in range(v1-self.files[md5][1]):
+                        #self.duplicate_file(md5)
+                #elif t == 'removed':
+                    #self.remove_file(md5)
         
-        self.history.clear()
-        for path, dirs, files in os.walk('.'):
-            for filename in files:
-                location = os.path.join(path, filename)
-                if filename[:9] == 'snapshot-' and int(filename[9:-5])>=begin :
-                    os.remove( location )
+        ##self.history.clear()
+        #for path, dirs, files in os.walk('.'):
+            #for filename in files:
+                #location = os.path.join(path, filename)
+                #if filename[:9] == 'snapshot-' and int(filename[9:-5])>=begin :
+                    #os.remove( location )
         
-        print("End restore!!")
+        #print("End restore!!")
 
     def clear(self):
-        with self.db_lock:
-            super().clear()
-            self.files.clear()
+        super().clear()
+        self.files.clear()

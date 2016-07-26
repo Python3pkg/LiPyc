@@ -1,14 +1,12 @@
 ->i/o in inner_scheduler : non-blocking or multothreaded
 ->pickle to sqlite3
-->transaction for restauration
 
 ->mthing to clear cache
 ->tester ftp
-
+->do doc
+->lang
 -> tester scheduler 
--> migration pikle vers SQLite(qqch un peu plus robuste )
 
-->suppression miniature
 
 -> search
 -> album/image tag 

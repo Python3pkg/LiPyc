@@ -9,6 +9,7 @@ from tempfile import SpooledTemporaryFile
 
 from lipyc.fs.utility import *
 from lipyc.fs.container import Container
+from lipyc.fs.transaction import Transaction
 from urllib.parse import urlparse
 
 class Bucket(Container): #décrit un dossier ex: photo, gdrive, dropbox
@@ -32,6 +33,8 @@ class Bucket(Container): #décrit un dossier ex: photo, gdrive, dropbox
         self.aeskey = aeskey
         self.path = path
                 
+        self.previous_lock = ''
+                
         self.lock = Lock()
         self._id =  generate_id(name)
         
@@ -45,6 +48,11 @@ class Bucket(Container): #décrit un dossier ex: photo, gdrive, dropbox
             tmp = os.path.join(path, d)
             if not os.path.isdir(tmp):
                 os.mkdir(tmp)
+       
+    def reset_storage(self):
+        dirs = ["data", "locks", "metadata", "transactions"] 
+        for d in dirs:
+            shutil.rmtree(os.path.join(self.path, d))
        
     def access(self, key):
         return self
@@ -164,29 +172,43 @@ class Bucket(Container): #décrit un dossier ex: photo, gdrive, dropbox
         for f in onlyfiles:
             if int(f.split("-")[3]) + ttl > time():
                 return False
-        
-        fp = open( os.path.join(self.path, "locks", "lock_%s_%d_%d" % (self.lib_name, idclient, time())), 'w')
+                
+        self.previous_lock = "lock_%s_%d_%d" % (self.lib_name, idclient, time())
+        fp = open( os.path.join(self.path, "locks", self.previous_lock), 'w')
         fp.write('0')
         
         return True
         
     def is_locked(self, idclient, ttl):
         onlyfiles = [f for f in os.listdir(os.path.join(self.path, "locks")) if os.path.isfile(os.path.join(self.path, f))]
-        for f in onlyfiles:
-            if int(f.split("-")[3]) + ttl > time() and f.split("-")[2] != idclient:
-                return False
-        return True
+        onlyfiles.filter(lambda f:f.split('-')[1]==self.lib_name)
+        onlyfiles = sorted(onlyfiles, keys=lambda x: int(x.split('-')[3]), reverse=True)
+        
+        if not onlyfiles:
+            return False
+        
+        if int(f.split("-")[3]) + ttl < time() or f.split("-")[2] != idclient:
+            return False
+        else:
+            True
+        
     
-    def transactions(self):
+    def unlock(self):
+        if os.path.exists(os.path.join(self.path, "locks", self.previous_lock)):
+            os.remove(os.path.join(self.path, "locks", self.previous_lock))
+        
+        self.previous_lock = ''
+        
+    def transactions(self):#todo for ftp
         transactions = set()
         for path, dirs, files in os.walk(os.path.join(self.path, 'transactions')): #rewirte with scandir for 3.5
             for filename in files:
                 location = os.path.join(path, filename)
                 
-                id_client, id_lib, time = filename.split('-')
+                id_lib, id_client, _ = filename.split('-')
                 if(id_lib == self.lib_name):
-                    tmp = Transaction(id_client, id_lib, time)
-                    tmp.load(os.path.join(self.path, 'transactions', filename))
+                    tmp = Transaction(id_client, id_lib)
+                    tmp.load(os.path.join(path, filename))
                     transactions.add( tmp )
         
         return transactions
