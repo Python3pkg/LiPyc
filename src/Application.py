@@ -467,25 +467,26 @@ class Application(Tk, WorkflowStep):
     def add_to(self,  parent_album):
         for obj in self.selected:
             if isinstance(obj, Album):
-                parent_album.add_subalbum( obj )
+                self.library.add_album_to(obj, parent_album)
             else:
-                parent_album.add_file( obj )
+                self.library.add_file_to(obj, parent_album)
                 
     def copy_to(self, parent_album):
         for obj in self.selected:
             if isinstance(obj, Album):
-                parent_album.add_subalbum( copy.deepcopy( obj ) )
+                self.library.copy_album_to(obj, parent_album)
             else:
-                parent_album.add_file( obj )
+                self.library.copy_file_to(obj, parent_album)
         
     def move_to(self, parent_album):        
         for obj in list(self.selected):
+            self.copy_to(parent_album)
             if isinstance(obj, Album):
-                parent_album.add_subalbum( obj  )
+                #parent_album.add_subalbum( obj  )
                 self.remove_album( obj )
             else:
-                self.library.scheduler.add_file(obj)
-                parent_album.add_file(obj)
+                #self.library.scheduler.add_file(obj)
+                #parent_album.add_file(obj)
                 self.remove_file(obj)
         
 ###### End ActionPanel

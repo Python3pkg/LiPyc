@@ -195,3 +195,7 @@ class DBFactory:
         print(key)
         with self.conn:
             self.conn.execute('DELETE FROM inner_albums WHERE key=?', (key,))
+    
+    def delete_first_layer_album(self, album):
+        with self.conn:
+            self.conn.execute('DELETE FROM first_layer_albums WHERE id_album=?', (album.id,))

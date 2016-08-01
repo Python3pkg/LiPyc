@@ -53,6 +53,7 @@ class Library(WorkflowStep):
         new.scheduler = self.scheduler # cannot be copied but it's thread-safe
         return new
         
+        
     def __exit__(self):
         self.store()
         
@@ -167,12 +168,14 @@ class Library(WorkflowStep):
 
         if album in self.albums:
             self.albums.discard( album )
-            db.delete_album(album)
-            
-            if album.thumbnail :
-                self.scheduler.remove_file( album.thumbnail )
+            db.remove_first_layer_album( album )
         
+        if album.thumbnail :
+            self.scheduler.remove_file( album.thumbnail )
+        
+        db.delete_album(album)
         self._remove_files(album.all_files(), db)
+        album.remove_all()
         
     def _remove_files(self, files, db):
         db.delete_files(files)
@@ -191,3 +194,19 @@ class Library(WorkflowStep):
         if os.path.exists(os.path.join(self.location, 'metadata.db')):
             os.remove( os.path.join(self.location, 'metadata.db') )
         self.scheduler.reset_storage()
+
+    def copy_file_to(self, afile, parent):
+        afile.duplicate()
+        parent.add_file( afile )
+    
+    def copy_album_to(self, album, parent):
+        album.duplicate()
+        
+        self.ressource_counter+=1
+        parent.add_subalbum(album.clone(self.ressource_counter))
+    
+    def add_file_to(self, *args):
+        self.copy_file_to(*args)
+        
+    def add_album_to(self, album, parent):
+        parent.add_subalbum(album.pseudo_clone())

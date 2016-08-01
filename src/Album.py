@@ -46,6 +46,22 @@ class Album(Versionned): #subalbums not fully implemented
         new.inner_keys = deepcopy(self.inner_keys)
         return new
         
+    #for copy_to,add_to,move_to
+    def clone(self, new_id):
+        alb = self.__deepcopy__(None)
+        alb.inner_keys.clear()
+        alb.id = new_id
+        
+        return alb
+        
+    def pseudo_clone(self):
+        new = Album(self.id, self.scheduler, self.name, self.datetime)
+        
+        new.subalbums = self.subalbums
+        new.thumbnail = self.thumbnail
+        new.files = self.files
+        return new
+        
     def sql(self):
         return (self.id, self.name, self.datetime, 
             '|'.join( [ str(alb.id) for alb in self.subalbums] ), self.thumbnail,
@@ -164,8 +180,21 @@ class Album(Versionned): #subalbums not fully implemented
     def __len__(self): #number of file in dir and subdir
         return len(self.files) + sum( [len(a) for a in self.subalbums ] )
         
+    @recursion_protect(0)
     def all_albums(self):
         return itertools.chain( [self], *list(map( lambda x:x.all_albums(), self.subalbums )) )
 
+    @recursion_protect(0)
     def all_files(self):
         return set(itertools.chain( *list(map(lambda x:x.files, self.all_albums()))))
+
+    @recursion_protect(0)
+    def duplicate(self):
+        if self.thumbnail:
+            self.scheduler.duplicate_file(self.thumbnail)
+      
+        for f in self.files:
+            f.duplicate()
+        
+        for alb in self.subalbums:
+            alb.duplicate()

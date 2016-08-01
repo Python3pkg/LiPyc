@@ -136,6 +136,11 @@ class File(Versionned):
     def store(self, location): 
         self.scheduler.add_file( location, self.md5, self.metadata.size )
       
+    def duplicate(self):
+        self.scheduler.duplicate_file(self.md5)
+        if self.thumbnail:
+            self.scheduler.duplicate_file(self.thumbnail)
+      
     def export_to(self, path):
         location = os.path.join(path, self.filename)
         

@@ -2,7 +2,7 @@ from distutils.core import setup
 import os
 
 setup(name="lipyc",
-        version="1.0.2.dev1",
+        version="1.0.3.dev1",
         description="A light picture manager",
         author="Laurent Prosperi",
         author_email="laurent.prosperi@ens-cachan.fr",
