@@ -158,7 +158,7 @@ class DBFactory:
     
     def build_first_layer_albums(self, albums):
         first_layer = set()
-        
+        print(albums)   
         with self.conn:
             for row in self.conn.execute('SELECT * FROM first_layer_albums'):
                 first_layer.add( albums[int(row[0])] )
@@ -170,6 +170,7 @@ class DBFactory:
         
         with self.conn:
             for row in self.conn.execute('SELECT * FROM inner_albums'):
+                print(row)
                 tmp = row[0].split('|')
                 if len(tmp) == 1:
                     inner_albums[tmp[0]] = albums[int(row[1])]
@@ -177,3 +178,20 @@ class DBFactory:
                     inner_albums[tuple(tmp)] = albums[int(row[1])]
 
         return inner_albums
+
+    def delete_files(self, files):
+        ids = ','.join([str(afile.id) for afile in files])
+        
+        with self.conn:
+            self.conn.execute('DELETE FROM file_metadata WHERE id_file IN (?)', (ids,))
+            self.conn.execute('DELETE FROM files WHERE id IN (?)', (ids,))
+
+    def delete_album(self, album):
+        with self.conn:
+            self.conn.execute('DELETE FROM albums WHERE id=?', (album.id,))
+            
+    def delete_inner_album(self, year, month=None):
+        key = (str(year) + '|' + str(month)) if month else str(year)
+        print(key)
+        with self.conn:
+            self.conn.execute('DELETE FROM inner_albums WHERE key=?', (key,))

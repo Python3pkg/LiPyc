@@ -1,5 +1,6 @@
+->add to/copy to/move to do not work with scheduler
+-> scheduler save freestorage
 ->i/o in inner_scheduler : non-blocking or multothreaded
-->pickle to sqlite3
 
 ->mthing to clear cache
 ->tester ftp
@@ -7,6 +8,7 @@
 ->lang
 -> tester scheduler 
 
+->refactoring
 
 -> search
 -> album/image tag 

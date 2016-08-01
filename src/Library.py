@@ -156,16 +156,32 @@ class Library(WorkflowStep):
         
     @io_protect()
     def remove_album(self, album):
+        db = DBFactory(self.location)
+
         if len( album.inner_keys ) == 2 :
+            db.delete_inner_album(album.inner_keys[0], album.inner_keys[1])
             del self.inner_albums[ (album.inner_keys[0], album.inner_keys[1]) ]
         elif len( album.inner_keys ) == 1:
+            db.delete_inner_album(album.inner_keys[0])
             del self.inner_albums[ album.inner_keys[0]]
-        
+
         if album in self.albums:
             self.albums.discard( album )
-
+            db.delete_album(album)
+            
             if album.thumbnail :
                 self.scheduler.remove_file( album.thumbnail )
+        
+        self._remove_files(album.all_files(), db)
+        
+    def _remove_files(self, files, db):
+        db.delete_files(files)
+        for _file in files:
+            _file.remove()
+    @io_protect()
+    def remove_files(self, files):  
+        self._remove_files(files, DBFactory(self.location) )
+        
                 
     def deep_files(self):
         return itertools.chain.from_iterable(map(Album.deep_files, self.albums))

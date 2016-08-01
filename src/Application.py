@@ -351,9 +351,8 @@ class Application(Tk, WorkflowStep):
         if not name :
             messagebox.showerror("Error", "Invalid name for album name")
 
-        global ressource_counter
-        ressource_counter +=1
-        album = Album(ressource_counter, self.library.scheduler, name )
+        self.library.ressource_counter +=1
+        album = Album(self.library.ressource_counter, self.library.scheduler, name )
         if self.parents_album :
             self.parents_album[-1].add_subalbum( album )
         else:
@@ -465,10 +464,6 @@ class Application(Tk, WorkflowStep):
 #### Begin RightPanel
 
 ###### Begin ActionPanel
-    # Warning : 
-    #       Never done deepcopy on a file, and use it as usual,
-    #    such a deecopy will disable the garbage collector for  the new object
-    
     def add_to(self,  parent_album):
         for obj in self.selected:
             if isinstance(obj, Album):
@@ -489,8 +484,9 @@ class Application(Tk, WorkflowStep):
                 parent_album.add_subalbum( obj  )
                 self.remove_album( obj )
             else:
-                parent_album.add_file( obj )
-                self.remove_file( obj )
+                self.library.scheduler.add_file(obj)
+                parent_album.add_file(obj)
+                self.remove_file(obj)
         
 ###### End ActionPanel
 
@@ -610,6 +606,7 @@ class Application(Tk, WorkflowStep):
    
     def remove_file(self, _file, refresh=False):#surtout pas de thread io
         self.parents_album[-1].remove_file( _file )
+        self.library.remove_files( [_file] )
         
         self.selected.discard(_file)
     
@@ -617,17 +614,17 @@ class Application(Tk, WorkflowStep):
             self.refresh()
             
     def remove_album(self, album, refresh=False):#surtout pas de thread io
-        album.remove_all()
-
         if self.parents_album:
             self.parents_album[-1].remove_subalbum( album )
-        self.library.remove_album( album )
         
-        self.selected.discard( album )
+        for alb in album.all_albums():
+            self.library.remove_album( alb )
+            self.selected.discard( alb )
            
         self.rightPanel.actionPanel.set()
         if refresh:
             self.refresh()
+
     
     def remove(self, objs):
         for obj in list(objs):

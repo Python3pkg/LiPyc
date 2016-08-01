@@ -106,7 +106,6 @@ class Album(Versionned): #subalbums not fully implemented
         
     def remove_file(self, _file):
         self.files.discard(_file)       
-        _file.remove()
     
     @recursion_protect()
     def remove_all(self):
@@ -168,3 +167,5 @@ class Album(Versionned): #subalbums not fully implemented
     def all_albums(self):
         return itertools.chain( [self], *list(map( lambda x:x.all_albums(), self.subalbums )) )
 
+    def all_files(self):
+        return set(itertools.chain( *list(map(lambda x:x.files, self.all_albums()))))

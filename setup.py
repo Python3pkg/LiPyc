@@ -2,7 +2,7 @@ from distutils.core import setup
 import os
 
 setup(name="lipyc",
-        version="1.0.0.dev1",
+        version="1.0.2.dev1",
         description="A light picture manager",
         author="Laurent Prosperi",
         author_email="laurent.prosperi@ens-cachan.fr",
@@ -23,7 +23,7 @@ setup(name="lipyc",
             'Programming Language :: Python :: 3.6'
         ],
         packages=["lipyc", "lipyc.panels", "lipyc.data", "lipyc.fs"],
-        scripts = ['launcher.py'],
+        scripts = ['launcher.py'],#todo launcher to lipyc
         keywords= ["picture", "managment"],
         package_dir = {"lipyc": "src", "lipyc.data":"data"},
         requires=["PIL", "tkinter", "pycrypto", "cv2"],

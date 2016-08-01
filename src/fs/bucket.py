@@ -38,7 +38,7 @@ class Bucket(Container): #décrit un dossier ex: photo, gdrive, dropbox
         self.lock = Lock()
         self._id =  generate_id(name)
         
-        self.urlObj      = urlparse( path )
+        self.urlObj = urlparse( path )
         self.scheme = self.urlObj.scheme #if not self.scheme ie mounted in user space
         self.login  = login
         self.pwd    = pwd
@@ -107,7 +107,8 @@ class Bucket(Container): #décrit un dossier ex: photo, gdrive, dropbox
     
     def remove(self, md5, size):
         with self.lock:
-            self.free_capacity += size        
+            print( self.free_capacity, size, self.max_capacity)
+            self.free_capacity += size 
             assert(self.free_capacity <= self.max_capacity)
             
         if not self.scheme:
