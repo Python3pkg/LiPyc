@@ -168,7 +168,7 @@ class Library(WorkflowStep):
 
         if album in self.albums:
             self.albums.discard( album )
-            db.remove_first_layer_album( album )
+            db.delete_first_layer_album( album )
         
         if album.thumbnail :
             self.scheduler.remove_file( album.thumbnail )

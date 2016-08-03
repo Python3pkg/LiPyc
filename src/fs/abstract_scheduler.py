@@ -108,16 +108,8 @@ class AbstractScheduler(Container):
             
     def __contains__(self, md5):
         return md5 in self.files
-     
-    #def duplicate_file(self, md5):
-        #self.snapshot()
-        #self.files[md5][1]+=1
-        #self.history.append( ('update', md5, self.files[md5][1]) )
-
-        #return md5
         
     def remove_file(self, md5):
-        #self.snapshot()   
         if md5 not in self.files:
             return
             
@@ -214,13 +206,17 @@ class AbstractScheduler(Container):
         data['pgs'] = {}
         
         for pg in self.pgs: 
-            tmp = {'aeskey':'', 'pools':{}}         
+            tmp = {'aeskey':'', 'pools':{}, 
+                'max_capacity':pg.max_capacity, 'free_capacity':pg.free_capacity}         
             for pool in pg.children:
-                tmp2 = {'buckets':{}, 'aeskey':''}
+                tmp2 = {'buckets':{}, 'aeskey':'',
+                    'max_capacity':pool.max_capacity, 
+                    'free_capacity':pool.free_capacity}
                 for bucket in pool.children:
                     tmp3 = {
                         'path':bucket.path,
                         'max_capacity':bucket.max_capacity,
+                        'free_capacity':bucket.free_capacity,
                         'speed':bucket.speed,
                         'crypt':bucket.crypt,
                         'aeskey':bucket.aeskey,

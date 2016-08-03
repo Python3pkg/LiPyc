@@ -158,7 +158,6 @@ class DBFactory:
     
     def build_first_layer_albums(self, albums):
         first_layer = set()
-        print(albums)   
         with self.conn:
             for row in self.conn.execute('SELECT * FROM first_layer_albums'):
                 first_layer.add( albums[int(row[0])] )
@@ -170,7 +169,6 @@ class DBFactory:
         
         with self.conn:
             for row in self.conn.execute('SELECT * FROM inner_albums'):
-                print(row)
                 tmp = row[0].split('|')
                 if len(tmp) == 1:
                     inner_albums[tmp[0]] = albums[int(row[1])]
@@ -192,7 +190,7 @@ class DBFactory:
             
     def delete_inner_album(self, year, month=None):
         key = (str(year) + '|' + str(month)) if month else str(year)
-        print(key)
+
         with self.conn:
             self.conn.execute('DELETE FROM inner_albums WHERE key=?', (key,))
     

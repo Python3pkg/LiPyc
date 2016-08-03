@@ -1,11 +1,10 @@
-->add to/copy to/move to do not work with scheduler
--> scheduler save freestorage
+->tester ftp
+->modification de scheduler map
+->lang
+
+->do doc
 ->i/o in inner_scheduler : non-blocking or multothreaded
 
-->mthing to clear cache
-->tester ftp
-->do doc
-->lang
 -> tester scheduler 
 
 ->refactoring

@@ -105,22 +105,6 @@ class File(Versionned):
         
     def sql(self):
         return (self.id, self.md5, self.filename, self.thumbnail) 
-        
-    #def __getstate__(self):
-        #print("Getting state")
-        #return {
-            #'md5':self.md5,
-            #'filename':self.filename,
-            #'metadata':self.metadata,
-            #'thumbnail':self.thumbnail
-        #}
-    
-    #def __setstate__(self, state):
-        #print("Setting state")
-        #self.md5 = state['md5']
-        #self.filename = state['filename']
-        #self.metadata = state['metadata']
-        #self.thumbnail = state['thumbnail']
     
     def extract(self, location): #called only the first time
         with open(location, "rb") as f:

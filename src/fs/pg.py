@@ -5,6 +5,11 @@ class PG(Container):
     def make(lib_name, name, json_pg, aeskey):#config json to pg
         pg = PG(name)
         aeskey = json_pg["aeskey"] if "aeskey" in json_pg else ""
+        if 'free_capacity' in json_pg:
+            pg.free_capacity = json_pg['free_capacity']
+        if 'max_capacity' in json_pg:
+            pg.max_capacity = json_pg['max_capacity']
+            
         for _name, json_pool in json_pg["pools"].items():
             pg.add( Pool.make(lib_name, name+"|"+_name, json_pool, aeskey) )
         

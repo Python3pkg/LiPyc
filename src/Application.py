@@ -276,7 +276,7 @@ class Application(Tk, WorkflowStep):
 #### Begin Views
     def display_albums(self, albums):
         self.action = Action.pagination_albums
-        
+
         self.set_last_objs(self.current_pagination, albums)
         
         self.mainPanel.set_pagination(albums)
@@ -343,6 +343,7 @@ class Application(Tk, WorkflowStep):
     def back(self):
         if self.parents_album:
             self.parents_album.pop()
+
         self.current = 0
         self.action = Action.pagination
         self.refresh()

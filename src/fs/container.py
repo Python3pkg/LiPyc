@@ -62,15 +62,17 @@ class Container:
         if not self.children:
             self.children.add( obj )
             return 
-        min_obj = min( self.children, key=lambda x:x.free_capacity )
+        
+        if not self._min_obj:
+            self._min_obj = min( self.children, key=lambda x:x.free_capacity )
         
         
-        if obj.free_capacity < min_obj.free_capacity :
+        if obj.free_capacity < self._min_obj.free_capacity :
+            self._min_obj = obj
             self.children.add( obj )
             return
         
-        r = int(obj.free_capacity / min_obj.free_capacity)
-        self._min_obj = obj
+        r = int(obj.free_capacity / self._min_obj.free_capacity)
 
         for k in range(min(r, max_ratio)):
             tmp = copy(obj)

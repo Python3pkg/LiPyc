@@ -57,6 +57,9 @@ class Album(Versionned): #subalbums not fully implemented
     def pseudo_clone(self):
         new = Album(self.id, self.scheduler, self.name, self.datetime)
         
+        if self.thumbnail:
+            self.scheduler.duplicate(self.thumbnail)
+       
         new.subalbums = self.subalbums
         new.thumbnail = self.thumbnail
         new.files = self.files
@@ -68,48 +71,6 @@ class Album(Versionned): #subalbums not fully implemented
             '|'.join( [ str(afile.id) for afile in self.files] ),
             '|'.join(self.inner_keys) )
             
-    #def __conform__(self, protocol):
-        #if protocol is sqlite3.PrepareProtocol:
-            #return '%s;%s;%s;%s;%s;%s;%s' % (self.id, self.name, 
-                #time.mktime(self.datetime.timetuple()),
-                #'|'.join( self.id for alb in self.subalbums),
-                #self.thumbnail,
-                #'|'.join( self.id for afile in self.files),
-                #self.inner_keys
-                #)
-                
-    #def __getstate__(self):
-        #return {
-            #'name':self.name,
-            #'datetime':self.datetime,
-            #'subalbums':self.subalbums,
-            #'thumbnail':self.thumbnail,
-            #'files':self.files, 
-            #'inner_keys':self.inner_keys
-        #}
-    
-    #def __setstate__(self, state):
-        #self.name = state['name']
-        #self.datetime = state['datetime']
-        #self.subalbums = state['subalbums']
-        #self.thumbnail = state['thumbnail']
-        
-        #flag = False
-        #for afile in state['files']:
-            #if not afile:
-                #flag = True
-                #break
-                
-        #if flag:
-            #self.files = set()
-        #else:
-            #self.files = state['files']
-        
-        #if self.files or self.name=='12':
-            #print(self.name)
-        #self.inner_keys = state['inner_keys']
-        
-        
     def rename(self, name):
         self.name = name
         

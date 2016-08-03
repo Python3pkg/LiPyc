@@ -276,15 +276,19 @@ class Tile(Panel):
         self.title.pack()
     
     def show(self):
-        if self.obj :
-            self.thumbnail.pack(padx=BORDER_THUMB/2, pady = BORDER_THUMB/2)
-            if isinstance(self.obj, Album):
-                self.title.pack()
+        self.thumbnail.pack(padx=BORDER_THUMB/2, pady = BORDER_THUMB/2)
+        if isinstance(self.obj, Album):
+            self.title.pack()
     
     def hide(self):
         self.configure(bg="white")
         self.title.pack_forget()
         self.thumbnail.pack_forget()
+        
+        self.obj = None
+        self.version = 0 
+        self.selected = False
+        self.data = None
     
     def set_album(self, album, k):  
         def _display(event):
@@ -315,7 +319,7 @@ class Tile(Panel):
             self.selected = obj in self.app.selected
             self.show()
         
-        if self.obj == obj and self.version == obj.version() :
+        if self.obj == obj and self.version == obj.version():
             return None
         
         if obj.thumbnail in thumbnails_cache:
@@ -349,9 +353,7 @@ class Tile(Panel):
         self.thumbnail.bind('<Triple-Button-1>', callback1 ) 
         self.thumbnail.bind('<Button-3>', callback1 ) 
         self.thumbnail.bind('<Button-1>', callback2 ) 
-    
-        
-        
+            
 class PaginationPanel(VScrolledPanel):
     def __init__(self, app, master, num_x, num_y, *args, **kwargs):
         super().__init__(master, bg="white", *args, **kwargs)
@@ -388,9 +390,7 @@ class PaginationPanel(VScrolledPanel):
         for i in range(0, min(len(objs), len(self.tiles))):
             self.tiles[i].set( objs[i], i )
             self.tiles[i].show()
-            
-            
-        
+                    
         for i in range(len(objs), len(self.tiles)):
             self.tiles[i].hide()
         
