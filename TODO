@@ -1,6 +1,5 @@
-->tester ftp
-->modification de scheduler map
-->lang
+-> tester ftp
+-> lang
 
 ->do doc
 ->i/o in inner_scheduler : non-blocking or multothreaded

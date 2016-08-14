@@ -155,7 +155,7 @@ class AbstractScheduler(Container):
                     bucket.write(md5, size, fp)
             
             for bucket in del_buckets:
-                bucket.remove(md5, size)
+                bucket.remove(md5, 0)
                 
         for pg in new_scheduler.pgs:
             pg.update_stats()  

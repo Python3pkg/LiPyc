@@ -134,7 +134,6 @@ class Bucket(Container): #décrit un dossier ex: photo, gdrive, dropbox
     def get_file(self, md5):#ftp ready
         if not self.scheme:
             if not self.crypt:
-                print( make_path(self.path, self.lib_name, md5))
                 return open( make_path(self.path, self.lib_name, md5), "rb")
             else:
                 cipher = AESCipher(self.aeskey)

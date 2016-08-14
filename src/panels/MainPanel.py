@@ -326,7 +326,7 @@ class Tile(Panel):
             self.data = thumbnails_cache[obj.thumbnail]
         else:
             afile = self.app.library.scheduler.get_file( obj.thumbnail )
-            print(afile)
+
             if afile:
                 self.data = ImageTk.PhotoImage( Image.open(afile))
                 thumbnails_cache[obj.thumbnail] = self.data
@@ -499,7 +499,7 @@ class EasySchedulerPanel(Panel):
             command=lambda _=None:self.build_add(self.tree.focus()))
         self.b_add.pack(side=LEFT)
         self.b_remove = Button(self.f_pgs_buttons, text="Remove", 
-            command=lambda _=None:self.app.build_)
+            command=lambda _=None:self.process_remove(self.tree.focus()))
         self.b_remove.pack(side=LEFT)
         self.b_update = Button(self.f_pgs_buttons, text="Update", 
             command=lambda _=None:self.build_update(self.tree.focus()))
@@ -612,7 +612,6 @@ class EasySchedulerPanel(Panel):
             self.v_area_pwd.set("")
             self.f_area.pack()
             self._bucket_area.pack()
-            
    
     def build_update(self, current_id):
         self.b_area_process.configure(command= lambda _=None:self.process_update(current_id))
@@ -671,35 +670,55 @@ class EasySchedulerPanel(Panel):
         self.tree.insert( parent_name, 'end',  name, 
             text=name.split('|')[-1], values=values)
         self.f_area.pack_forget()
+         
+    def process_remove(self, current_id):
+        name = self.memory[ current_id ].name
+        parent_id =  '|'.join( name.split('|')[:-1])
+     
+        if parent_id:
+            parent = self.memory[ parent_id ]
+            parent.remove(self.memory[ current_id ])
            
+        del self.memory[current_id]
+        self.tree.delete(current_id)
+        
+        for key in list(self.memory.keys()):
+            if key.startswith(name):
+                del self.memory[key]
+            
     def process_update(self, current_id):
         previous_name = self.memory[ current_id ].name
         name = '|'.join( previous_name.split('|')[:-1] + [self.v_area_name.get()] )
         parent_id =  '|'.join( previous_name.split('|')[:-1])
         
-        if len(previous_name.split('|')[:-1])==1: #pg 
-            self.memory[current_id] = PG(name)
+        if not parent_id: #pg 
+            self.memory[current_id].name = name
             self.tree.item( current_id, text=name.split('|')[-1])
 
         elif len(previous_name.split('|')) == 2: #pool
-            self.memory[parent_id].remove( self.memory[current_id] )
-            self.memory[current_id] = Pool(name)
-            self.memory[parent_id].add( self.memory[current_id] )
-
-            
+            self.memory[current_id].name = name
             self.tree.item( current_id, text=name.split('|')[-1])
+            
         else: #bucket
-            self.memory[parent_id].remove( self.memory[current_id] )
-            self.memory[current_id]=Bucket(name=name, 
-                aeskey=self.v_area_aeskey.get(),
-                crypt=self.v_area_crypt.get(),
-                max_capacity=self.v_area_max_capacity.get(),
-                path=self.v_area_path.get(),
-                speed=self.v_area_speed.get(),
-                login=self.v_area_login.get(),
-                pwd=self.v_area_pwd.get(),
-                )
-            self.memory[parent_id].add( self.memory[current_id] )
+            self.memory[current_id].name = name
+            self.memory[current_id].aeskey = self.v_area_aeskey.get()
+            self.memory[current_id].max_capacity = self.v_area_crypt.get()
+            self.memory[current_id].path = self.v_area_path.get()
+            self.memory[current_id].speed = self.v_area_speed.get()
+            self.memory[current_id].login = self.v_area_login.get()
+            self.memory[current_id].pwd = self.v_area_pwd.get()
+            
+            
+            #Bucket(name=name, 
+                #aeskey=self.v_area_aeskey.get(),
+                #crypt=self.v_area_crypt.get(),
+                #max_capacity=self.v_area_max_capacity.get(),
+                #path=self.v_area_path.get(),
+                #speed=self.v_area_speed.get(),
+                #login=self.v_area_login.get(),
+                #pwd=self.v_area_pwd.get(),
+                #)
+            #self.memory[parent_id].add( self.memory[current_id] )
             
             
             self.tree.item( current_id, text=name.split('|')[-1])
