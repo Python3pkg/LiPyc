@@ -665,7 +665,7 @@ class Application(Tk, WorkflowStep):
         if not self.library:
             messagebox.showerror("Error", "No library openned")
             return 
-            
+
         with open("pgs.json", "w") as fp:
             fp.write(data)
             

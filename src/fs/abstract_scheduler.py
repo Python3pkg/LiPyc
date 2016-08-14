@@ -137,7 +137,7 @@ class AbstractScheduler(Container):
     ##
     # @param struct set of pgs
     def update_structure(self, replicat, struct):
-        new_scheduler = AbstractScheduler( replicat )
+        new_scheduler = AbstractScheduler( self.lib_name, self.id_client, replicat, self.path )
         for pg in struct:
             new_scheduler.add(pg)
             
@@ -146,9 +146,10 @@ class AbstractScheduler(Container):
 
             new_buckets = set(map( lambda pg: pg.place(key, size), new_scheduler._place(key)))
             pre_buckets = set(map( lambda pg: pg.place(key, 0), self._place(key)))
+
             ins_buckets = new_buckets.difference( pre_buckets )
             del_buckets = pre_buckets.difference( new_buckets )
-            
+
             with self.get_file(md5) as fp:
                 for bucket in ins_buckets:
                     bucket.write(md5, size, fp)
@@ -162,8 +163,6 @@ class AbstractScheduler(Container):
         self.replicat = new_scheduler.replicat
         self.children.clear()
         self.children.update( new_scheduler.children)
-        self.files.clear()
-        self.files.update( new_scheduler.files)
         
         assert( self.replicat == new_scheduler.replicat)
         assert( self.replicat == replicat)

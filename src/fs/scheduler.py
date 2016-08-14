@@ -87,9 +87,6 @@ class Scheduler:
     def load(self):
         self.abstractScheduler.load()
         
-        #for key in self.abstractScheduler.files:
-            #self.files.add(key)
-        
     def store(self):
         self.Exit.set()
         while self.innerScheduler.is_alive():

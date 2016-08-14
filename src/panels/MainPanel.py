@@ -326,6 +326,7 @@ class Tile(Panel):
             self.data = thumbnails_cache[obj.thumbnail]
         else:
             afile = self.app.library.scheduler.get_file( obj.thumbnail )
+            print(afile)
             if afile:
                 self.data = ImageTk.PhotoImage( Image.open(afile))
                 thumbnails_cache[obj.thumbnail] = self.data
@@ -596,7 +597,12 @@ class EasySchedulerPanel(Panel):
     def build_add(self, parent_id):
         self.b_area_process.configure(command= lambda _=None:self.process_add(parent_id))
         parent = self.memory[parent_id]
-        if len(parent.name.split('|')) == 2: #parent is pool
+
+        
+        if not parent or len(parent.name.split('|')) != 2: #parent is not pool            
+            self.f_area.pack()
+            self._bucket_area.pack_forget()
+        else:
             self.v_area_aeskey.set("")
             self.v_area_crypt.set(False)
             self.v_area_max_capacity.set(0)
@@ -604,12 +610,9 @@ class EasySchedulerPanel(Panel):
             self.v_area_path.set("")
             self.v_area_login.set("")
             self.v_area_pwd.set("")
-            
             self.f_area.pack()
             self._bucket_area.pack()
-        else:
-            self.f_area.pack()
-            self._bucket_area.pack_forget()
+            
    
     def build_update(self, current_id):
         self.b_area_process.configure(command= lambda _=None:self.process_update(current_id))
@@ -634,7 +637,10 @@ class EasySchedulerPanel(Panel):
             self._bucket_area.pack_forget()
             
     def process_add(self, parent_id):
-        parent_name = self.memory[parent_id].name
+        if self.memory[parent_id]:
+            parent_name = self.memory[parent_id].name
+        else:
+            parent_name = ''
         name = parent_name+'|'+self.v_area_name.get() if parent_name else self.v_area_name.get()
         values=[]
         if not parent_name: #pg 
@@ -655,6 +661,8 @@ class EasySchedulerPanel(Panel):
                 pwd=self.v_area_pwd.get(),
                 )
             self.memory[parent_name].add( self.memory[name] )
+            self.memory[parent_name.split('|')[0]].add( self.memory[name], inner=False)
+            
             
             values = [self.v_area_aeskey.get(), self.v_area_crypt.get(),
             self.v_area_max_capacity.get(), self.v_area_speed.get(), 

@@ -134,6 +134,7 @@ class Bucket(Container): #décrit un dossier ex: photo, gdrive, dropbox
     def get_file(self, md5):#ftp ready
         if not self.scheme:
             if not self.crypt:
+                print( make_path(self.path, self.lib_name, md5))
                 return open( make_path(self.path, self.lib_name, md5), "rb")
             else:
                 cipher = AESCipher(self.aeskey)
@@ -169,7 +170,7 @@ class Bucket(Container): #décrit un dossier ex: photo, gdrive, dropbox
         state["scheme"] = self.scheme
         state["login"] = self.login
         state["pwd"] = self.pwd
-        
+        state["previous_lock"] = self.previous_lock
         return state
         
     def __setstate__(self, state):
@@ -182,8 +183,10 @@ class Bucket(Container): #décrit un dossier ex: photo, gdrive, dropbox
         self.scheme = state['scheme']
         self.login = state['login']
         self.pwd = state['pwd']
-        self.lock=Lock()
+        self.previous_lock = state['previous_lock']
 
+        self.lock=Lock()
+        
     def try_lock(self, idclient, ttl):#ftp ready
         if not self.scheme:
             onlyfiles = [f for f in os.listdir(os.path.join(self.path, "locks")) if os.path.isfile(os.path.join(self.path, f))]
@@ -224,6 +227,9 @@ class Bucket(Container): #décrit un dossier ex: photo, gdrive, dropbox
         
     
     def unlock(self):#ftp ready
+        if not self.previous_lock:
+            return
+        
         if not self.scheme:
             if os.path.exists(os.path.join(self.path, "locks", self.previous_lock)):
                 os.remove(os.path.join(self.path, "locks", self.previous_lock))

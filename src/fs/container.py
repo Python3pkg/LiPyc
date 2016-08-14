@@ -42,12 +42,13 @@ class Container:
         self._id = generate_id(_name)
         self._name = _name
   
-    def add(self, obj, disjoint=False):
+    def add(self, obj, disjoint=False, inner=True):
         self.max_capacity += obj.max_capacity
         self.free_capacity += obj.free_capacity
         self.speed += obj.speed if disjoint else 0
         
-        self._add(obj)
+        if inner:
+            self._add(obj)
         assert(self.free_capacity >= 0)
       
     def remove(self, obj, disjoint=False):
@@ -71,7 +72,7 @@ class Container:
             self._min_obj = obj
             self.children.add( obj )
             return
-        
+
         r = int(obj.free_capacity / self._min_obj.free_capacity)
 
         for k in range(min(r, max_ratio)):

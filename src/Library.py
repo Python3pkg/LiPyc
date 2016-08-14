@@ -60,7 +60,7 @@ class Library(WorkflowStep):
     @io_protect()
     def load(self):
         self.scheduler.load()
-
+        print(self.scheduler.abstractScheduler)
         db = DBFactory(self.location)
         files = db.build_files(self.scheduler)
         albums = db.build_albums(self.scheduler, files)

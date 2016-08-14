@@ -2,6 +2,7 @@ import json
 import os
 from time import time
 from functools import total_ordering
+import pickle
 
 @total_ordering
 class Transaction:
@@ -49,6 +50,8 @@ class Transaction:
             t,row = tmp[0], tmp[1:]
             if t == 'added':
                 self.data.append( tuple([t, None] + row) )
+            elif t == 'struct':
+                self.data.append( (t, row[0], pickle.loads(bytes(row[1]))[0]) ) 
             else:
                 self.data.append(tmp)
         
@@ -61,6 +64,8 @@ class Transaction:
             t,row = tmp[0], tmp[1:]
             if t == 'added':
                 data.append( [t] + list(row[1:]) )
+            elif t == 'struct':
+                data.append( [t, row[0], list(pickle.dumps(row[1:]))] ) 
             else:
                 data.append(tmp)
                 
