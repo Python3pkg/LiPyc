@@ -65,7 +65,7 @@ class FileMetadata:
         if image:
             info = image._getexif()
             if info :
-                for tag, value in info.items():
+                for tag, value in list(info.items()):
                     decoded = TAGS.get(tag, tag)
                     if decoded == 'DateTime' or decoded == 'DateTimeOriginal':
                         self.datetime  = time.strptime( value, "%Y:%m:%d %H:%M:%S")

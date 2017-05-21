@@ -191,7 +191,7 @@ class Bucket(Container): #décrit un dossier ex: photo, gdrive, dropbox
             onlyfiles = [f for f in os.listdir(os.path.join(self.path, "locks")) if os.path.isfile(os.path.join(self.path, f))]
         elif self.scheme[:3]=='ftp':
             with self.ftp_connect() as ftp:
-                onlyfiles = filter(lambda x,y:y['type'] == 'file', ftp.mlsd(self.urlObj.path+'/'+'locks', ['type']))
+                onlyfiles = list(filter(lambda x,y:y['type'] == 'file', ftp.mlsd(self.urlObj.path+'/'+'locks', ['type'])))
                 
         for f in onlyfiles:
             if int(f.split("-")[3]) + ttl > time():
@@ -211,7 +211,7 @@ class Bucket(Container): #décrit un dossier ex: photo, gdrive, dropbox
             onlyfiles = [f for f in os.listdir(os.path.join(self.path, "locks")) if os.path.isfile(os.path.join(self.path, f))]
         elif self.scheme[:3]=='ftp':
             with self.ftp_connect() as ftp:
-                onlyfiles = filter(lambda x,y:y['type'] == 'file', ftp.mlsd(self.urlObj.path+'/'+'locks', ['type']))
+                onlyfiles = list(filter(lambda x,y:y['type'] == 'file', ftp.mlsd(self.urlObj.path+'/'+'locks', ['type'])))
                 
         onlyfiles.filter(lambda f:f.split('-')[1]==self.lib_name)
         onlyfiles = sorted(onlyfiles, keys=lambda x: int(x.split('-')[3]), reverse=True)
@@ -234,8 +234,8 @@ class Bucket(Container): #décrit un dossier ex: photo, gdrive, dropbox
                 os.remove(os.path.join(self.path, "locks", self.previous_lock))
         elif self.scheme[:3]=='ftp':
             with self.ftp_connect() as ftp:
-                onlyfiles = filter(lambda x,y:y['type'] == 'file', ftp.mlsd(self.urlObj.path+'/'+'locks', ['type']))
-                if self.previous_lock in map(lambda x,y:x, onlyfiles):
+                onlyfiles = list(filter(lambda x,y:y['type'] == 'file', ftp.mlsd(self.urlObj.path+'/'+'locks', ['type'])))
+                if self.previous_lock in list(map(lambda x,y:x, onlyfiles)):
                     ftp.delete(self.urlObj.path+'/'+'locks'+'/'+self.previous_lock)
 
         self.previous_lock = ''
@@ -255,7 +255,7 @@ class Bucket(Container): #décrit un dossier ex: photo, gdrive, dropbox
                         transactions.add( tmp )
         elif self.scheme[:3]=='ftp':
             with self.ftp_connect() as ftp:
-                onlyfiles = filter(lambda x,y:y['type'] == 'file', ftp.mlsd(self.urlObj.path+'/'+'transactions', ['type']))
+                onlyfiles = list(filter(lambda x,y:y['type'] == 'file', ftp.mlsd(self.urlObj.path+'/'+'transactions', ['type'])))
                 for filename in onlyfiles:
                     location = os.path.join(path, filename)
                     

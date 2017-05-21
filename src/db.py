@@ -91,7 +91,7 @@ class DBFactory:
         self.save_file_metadata( [afile.metadata for afile in files] )
     
     def save_inner_albums(self, inner_albums):
-        data = [ ('|'.join(key) if not isinstance(key, str) else key, alb.id) for key, alb in inner_albums.items() ]
+        data = [ ('|'.join(key) if not isinstance(key, str) else key, alb.id) for key, alb in list(inner_albums.items()) ]
 
         with self.conn:
             self.conn.executemany('''INSERT OR REPLACE INTO inner_albums 

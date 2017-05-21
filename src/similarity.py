@@ -39,8 +39,8 @@ def bf_matches_orb(img1, img2):#Brute-Force Matching with ORB Descriptors
     #ici threshold c'est une distance
     threshold = 60
     for x in matches:
-        print(x.distance)
-    if len(list(filter(lambda x: x.distance<threshold, matches)))>  50:
+        print((x.distance))
+    if len(list([x for x in matches if x.distance<threshold]))>  50:
         return True
     return False
 

@@ -10,7 +10,7 @@ class PG(Container):
         if 'max_capacity' in json_pg:
             pg.max_capacity = json_pg['max_capacity']
             
-        for _name, json_pool in json_pg["pools"].items():
+        for _name, json_pool in list(json_pg["pools"].items()):
             pg.add( Pool.make(lib_name, name+"|"+_name, json_pool, aeskey) )
         
         return pg

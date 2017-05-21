@@ -82,12 +82,12 @@ class Library(WorkflowStep):
     @io_protect()
     def store(self):
         files = set()
-        for alb in itertools.chain( *list(map(lambda x:x.all_albums(), self.albums)) ):
+        for alb in itertools.chain( *list([x.all_albums() for x in self.albums]) ):
             files.update( alb.files )
             
         db = DBFactory(self.location)
         db.save_files(files)
-        db.save_albums(itertools.chain( *list(map(lambda x:x.all_albums(), self.albums)) ))
+        db.save_albums(itertools.chain( *list([x.all_albums() for x in self.albums]) ))
         db.save_first_layer_albums(self.albums)
         db.save_inner_albums(self.inner_albums)
         db.close()
@@ -187,7 +187,7 @@ class Library(WorkflowStep):
         
                 
     def deep_files(self):
-        return itertools.chain.from_iterable(map(Album.deep_files, self.albums))
+        return itertools.chain.from_iterable(list(map(Album.deep_files, self.albums)))
 
  
     def reset_storage(self):

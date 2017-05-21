@@ -154,4 +154,4 @@ class Container:
         self.lock=Lock()
           
     def buckets(self):
-        return itertools.chain( *list(map( lambda x:x.buckets(), self.children )))
+        return itertools.chain( *list([x.buckets() for x in self.children]))

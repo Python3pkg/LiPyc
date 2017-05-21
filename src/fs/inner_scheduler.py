@@ -95,7 +95,7 @@ class InnerScheduler(Thread):
         transactions = set()
         buckets = self.abstractScheduler.buckets() #peut être access(0)??,
         replicat = self.abstractScheduler.replicat
-        for bucket,_ in zip(buckets, range(replicat)):
+        for bucket,_ in zip(buckets, list(range(replicat))):
             for tr in bucket.transactions():
                 if tr.id() not in self.applied_transactions:
                     transactions.add(tr)

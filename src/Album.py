@@ -133,7 +133,7 @@ class Album(Versionned): #subalbums not fully implemented
             self.thumbnail = self.scheduler.add_file(location_album_default) #size and md5  ought to be combute once for all
     
     def deep_files(self):
-        tmp = itertools.chain.from_iterable(map(Album.deep_files, self.subalbums))
+        tmp = itertools.chain.from_iterable(list(map(Album.deep_files, self.subalbums)))
         return itertools.chain( self.files, tmp)
     
     
@@ -143,11 +143,11 @@ class Album(Versionned): #subalbums not fully implemented
         
     @recursion_protect(0)
     def all_albums(self):
-        return itertools.chain( [self], *list(map( lambda x:x.all_albums(), self.subalbums )) )
+        return itertools.chain( [self], *list([x.all_albums() for x in self.subalbums]) )
 
     @recursion_protect(0)
     def all_files(self):
-        return set(itertools.chain( *list(map(lambda x:x.files, self.all_albums()))))
+        return set(itertools.chain( *list([x.files for x in self.all_albums()])))
 
     @recursion_protect(0)
     def duplicate(self):

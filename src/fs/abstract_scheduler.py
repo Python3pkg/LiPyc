@@ -59,15 +59,15 @@ class AbstractScheduler(Container):
 
     def _place(self, key):
         pgs = sorted(self.pgs, key = lambda obj:wrand( obj._id, key))
-        return [pg for _,pg in zip( range(self.replicat), pgs) ]
+        return [pg for _,pg in zip( list(range(self.replicat)), pgs) ]
         
     def place(self,  key, size=0): 
-        return map( lambda pg: pg.place(key, size), self._place(key))
+        return [pg.place(key, size) for pg in self._place(key)]
 
     def access(self, key):
         pgs = sorted(self.pgs, key = lambda obj:wrand( obj._id, key))
-        buckets = [ pg.access( key ) for _,pg in zip( range(self.replicat), pgs) ]
-        tmp_buckets = list( filter( lambda bucket: not bucket.crypt, buckets) )
+        buckets = [ pg.access( key ) for _,pg in zip( list(range(self.replicat)), pgs) ]
+        tmp_buckets = list( [bucket for bucket in buckets if not bucket.crypt] )
         
         if tmp_buckets:
             buckets = tmp_buckets
@@ -141,11 +141,11 @@ class AbstractScheduler(Container):
         for pg in struct:
             new_scheduler.add(pg)
             
-        for md5,(size,counter) in self.files.items():
+        for md5,(size,counter) in list(self.files.items()):
             key = int(md5, 16)
 
-            new_buckets = set(map( lambda pg: pg.place(key, size), new_scheduler._place(key)))
-            pre_buckets = set(map( lambda pg: pg.place(key, 0), self._place(key)))
+            new_buckets = set([pg.place(key, size) for pg in new_scheduler._place(key)])
+            pre_buckets = set([pg.place(key, 0) for pg in self._place(key)])
 
             ins_buckets = new_buckets.difference( pre_buckets )
             del_buckets = pre_buckets.difference( new_buckets )
@@ -188,7 +188,7 @@ class AbstractScheduler(Container):
             self.replicat = config["replicat"]
             aeskey = config["aeskey"] if "aeskey" in config else ""
 
-            assert( len(config["pgs"]) == len(config["pgs"].keys()))
+            assert( len(config["pgs"]) == len(list(config["pgs"].keys())))
 
             pgs=list(config["pgs"].items())
             for name, json_pg in pgs:
@@ -278,7 +278,7 @@ class AbstractScheduler(Container):
         report = {
             "usage": int(100 * float(mc-fc) / float(mc)) if mc > 0 else 0,
             "capacity": sizeof_fmt((mc-fc)*self.replicat),
-            "true_capacity": sizeof_fmt(self.replicat * sum( [ size for size,_ in self.files.values() ] )),
+            "true_capacity": sizeof_fmt(self.replicat * sum( [ size for size,_ in list(self.files.values()) ] )),
             "max_capacity": sizeof_fmt(mc),
             "free_capacity": sizeof_fmt(fc),
             "replicat": self.replicat
@@ -286,7 +286,7 @@ class AbstractScheduler(Container):
         return report
     
     def buckets(self):
-        return itertools.chain( *list(map( lambda x:x.buckets(), self.pgs )) )
+        return itertools.chain( *list([x.buckets() for x in self.pgs]) )
 
     #def quick_restore(self):#be carfull must be used at the start of the application
         #self.clear()

@@ -131,7 +131,7 @@ class ARCCache(Cache):
         return len( self.cached )
 
     def items(self):
-        return self.cached.items()
+        return list(self.cached.items())
         
     def __contains__(self, key):
         return key in self.cached
@@ -179,7 +179,7 @@ class HybridCache(Cache):
         return self.number
         
     def items(self):
-        return self.data.items()
+        return list(self.data.items())
     
     def __contains__(self, key):
         return (key in self.cache) or (key in self.data)

@@ -10,7 +10,7 @@ class Pool(Container):  #on décrit un disque par exemple avec pool
         if 'max_capacity' in json_pool:
             pool.max_capacity = json_pool['max_capacity']
         
-        for _name, json_pool in json_pool["buckets"].items():
+        for _name, json_pool in list(json_pool["buckets"].items()):
             pool.add( Bucket.make(lib_name, name+"|"+_name, json_pool, aeskey) )
         
         return pool

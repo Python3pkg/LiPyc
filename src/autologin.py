@@ -96,7 +96,7 @@ def format_args(args, kwargs):
     for item in args:
         allargs.append('%s' % str(item))
 
-    for key, item in kwargs.items():
+    for key, item in list(kwargs.items()):
         allargs.append('%s=%s' % (key, str(item)))
 
     formattedArgs = ', '.join(allargs)
@@ -131,7 +131,7 @@ def log_method(method, display_name=None):
 
 def log_class(cls, log_match=".*", log_no_match="asdfnomatch", display_name=None):
     display_name = display_name or "%s" % (cls.__name__)
-    names_to_check = cls.__dict__.keys()
+    names_to_check = list(cls.__dict__.keys())
     allow = lambda s: all([
         re.match(log_match, s),
         not re.match(log_no_match, s),
@@ -152,15 +152,15 @@ def log_class(cls, log_match=".*", log_no_match="asdfnomatch", display_name=None
             setattr(cls, name, log_method(value, display_name=display_name))
 
         if isinstance(value, types.MethodType):
-            print(name, value)
+            print((name, value))
             # a normal instance method
-            if value.im_self is None:
+            if value.__self__ is None:
                 setattr(cls, name, log_method(value, display_name=display_name))
 
             # check for cls method. class & static method are more complex.
-            elif value.im_self == cls:
+            elif value.__self__ == cls:
                 _display_name = "%s.%s" % (cls.__name__, value.__name__)
-                w = log_method(value.im_func, display_name=_display_name)
+                w = log_method(value.__func__, display_name=_display_name)
                 setattr(cls, name, classmethod(w))
             else:
                 assert False

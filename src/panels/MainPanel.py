@@ -443,7 +443,7 @@ class EasySchedulerPanel(Panel):
         self.f_buttons.pack()
         self.b_apply = Button(self.f_buttons, text="Apply", 
             command=lambda _=None:self.app.library.scheduler.update_structure( self.v_replicat.get(),
-            [value for key,value in self.memory.items() if len(key.split('|')) ==1 and key !='']) )
+            [value for key,value in list(self.memory.items()) if len(key.split('|')) ==1 and key !='']) )
         self.b_apply.pack(side=LEFT)
         self.b_reset = Button(self.f_buttons, text="Reset", command=self.reset_all)
         self.b_reset.pack(side=LEFT)
@@ -818,7 +818,7 @@ class MainPanel(Panel):
             "easy_self.app.library.scheduler": EasySchedulerPanel(app, self),
         }
         
-        for panel in self.centers.values() :
+        for panel in list(self.centers.values()) :
             panel.grid(row=1, column=0)
             panel.hide()
             

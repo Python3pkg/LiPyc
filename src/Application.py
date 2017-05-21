@@ -558,7 +558,7 @@ class Application(Tk, WorkflowStep):
         similarities=[]
         history = set()
         
-        for f, twins in similarities0.items():
+        for f, twins in list(similarities0.items()):
             if not history.intersection( twins ) and not f in history:
                 history.add(f)
                 history.update(twins)
